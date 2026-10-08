@@ -4,6 +4,8 @@
   --text: #1f1f1e;
   --text-muted: #77766f;
   --accent: #1a6fd1;
+  --line: rgba(0, 0, 0, 0.1);
+  --line-strong: rgba(0, 0, 0, 0.22);
   color-scheme: light dark;
 }
 
@@ -14,6 +16,8 @@
     --text: #f2f2f0;
     --text-muted: #9a988f;
     --accent: #5aa2f0;
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.24);
   }
 }
 
@@ -112,6 +116,73 @@ h1 {
   padding: 20px;
   font-size: 14px;
   color: var(--text-muted);
+}
+
+/* One item in the list */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 20px 6px 8px;
+  border-top: 0.5px solid var(--line);
+}
+
+.check {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.circle .icon {
+  display: none;
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
+}
+
+.row.done .circle {
+  border-color: var(--line);
+}
+
+.row.done .circle .icon {
+  display: block;
+}
+
+.row-text {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.row-title {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.row.done .row-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.row-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .add-bar {

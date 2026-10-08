@@ -24,6 +24,9 @@
     <symbol id="i-plus" viewBox="0 0 24 24">
       <path d="M12 5v14M5 12h14"/>
     </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="M5 12.5l4.5 4.5L19 7.5"/>
+    </symbol>
   </svg>
 
   <div id="app">
@@ -40,9 +43,7 @@
       </button>
     </header>
 
-    <main class="list">
-      <p class="empty">Start your list. Tap Add an item.</p>
-    </main>
+    <main class="list" id="list" role="list"></main>
 
     <button class="add-bar">
       <span>Add an item</span>
