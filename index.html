@@ -27,6 +27,9 @@
     <symbol id="i-check" viewBox="0 0 24 24">
         <path d="M5 12.5l4.5 4.5L19 7.5"/>
     </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>
+    </symbol>
   </svg>
 
   <div id="app">
@@ -61,6 +64,11 @@
         <div class="grab"><span></span></div>
         <div class="drawer-top">
             <span class="chip" id="chip"></span>
+            <span class="drawer-actions">
+                <button class="icon-btn" id="trash" aria-label="Delete item" hidden>
+                <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+                </button>
+            </span>
         </div>
         <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
         <textarea id="item-body" placeholder="Add a description"></textarea>
@@ -69,5 +77,6 @@
             <button id="done">Add</button>
         </div>
     </section>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -10,11 +10,13 @@ const el = {
   scrim: $('scrim'),
   drawer: $('drawer'),
   chip: $('chip'),
+  trash: $('trash'),
   itemTitle: $('item-title'),
   itemBody: $('item-body'),
   foot: $('drawer-foot'),
   hint: $('hint'),
   done: $('done'),
+  toast: $('toast'),
 };
 
 // Everything on screen is drawn from this object. IndexedDB is the saved copy.
@@ -64,10 +66,10 @@ function renderRow(item) {
     <button class="check" role="checkbox" aria-label="Done">
       <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
     </button>
-    <div class="row-text">
-      <p class="row-title"></p>
-      <p class="row-sub"></p>
-    </div>`;
+    <button class="row-text">
+      <span class="row-title"></span>
+      <span class="row-sub"></span>
+    </button>`;
 
   row.querySelector('.check').setAttribute('aria-checked', String(item.done));
   row.querySelector('.row-title').textContent = item.title;
@@ -83,7 +85,6 @@ function renderRow(item) {
 function renderEmpty() {
   const p = document.createElement('p');
   p.className = 'empty';
-//   p.textContent = 'Start your list. Tap Add an item.';
   p.textContent = 'Start your list. Tap the plus to add an item.';
   return p;
 }
@@ -96,21 +97,25 @@ function render() {
   el.list.replaceChildren(...(items.length ? items.map(renderRow) : [renderEmpty()]));
 }
 
-/* ---------- ticking an item ---------- */
+/* ---------- ticking or opening an item ---------- */
 
 // One listener on the container instead of one per row. Rows are rebuilt on
 // every render, so per-row listeners would be thrown away each time.
 el.list.addEventListener('click', (e) => {
-  const check = e.target.closest('.check');
-  if (!check) return;
+  const row = e.target.closest('.row');
+  if (!row) return;
 
-  const item = state.items.find((i) => i.id === check.closest('.row').dataset.id);
+  const item = state.items.find((i) => i.id === row.dataset.id);
   if (!item) return;
 
-  item.done = !item.done;
-  item.updatedAt = Date.now();
-  render();                                   // update the screen first
-  db.put('items', item).catch(console.error); // then save it
+  if (e.target.closest('.check')) {
+    item.done = !item.done;
+    item.updatedAt = Date.now();
+    render();                                   // update the screen first
+    db.put('items', item).catch(console.error); // then save it
+  } else if (e.target.closest('.row-text')) {
+    openEdit(item);
+  }
 });
 
 /* ---------- adding an item ---------- */
@@ -139,46 +144,119 @@ function addItem(title, body) {
   db.put('items', item).catch(console.error);
 }
 
+/* ---------- toast with undo ---------- */
+
+let toastTimer = null;
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  el.toast.classList.remove('show');
+}
+
+function showToast(message, onUndo) {
+  clearTimeout(toastTimer);
+
+  const text = document.createElement('span');
+  text.textContent = message;
+  el.toast.replaceChildren(text);
+
+  if (onUndo) {
+    const undo = document.createElement('button');
+    undo.textContent = 'Undo';
+    undo.addEventListener('click', () => {
+      hideToast();
+      onUndo();
+    });
+    el.toast.append(undo);
+  }
+
+  el.toast.classList.add('show');
+  toastTimer = setTimeout(hideToast, 4000);
+}
+
 /* ---------- the drawer ---------- */
 
-let drawerOpen = false;
+// null when closed, otherwise { mode: 'add' | 'edit', item }
+let drawer = null;
+let saveTimer = null;
 
 function setHint(message, isError = false) {
   el.hint.textContent = message;
   el.foot.classList.toggle('error', isError);
 }
 
-function openAdd() {
+function showDrawer(mode, item) {
+  drawer = { mode, item };
+  hideToast();
+
   el.chip.textContent = state.lists[state.current].name;
-  el.itemTitle.value = '';
-  el.itemBody.value = '';
+  el.itemTitle.value = item ? item.title : '';
+  el.itemBody.value = item ? item.body : '';
+  el.trash.hidden = mode !== 'edit';
+  el.done.textContent = mode === 'add' ? 'Add' : 'Done';
+  el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
   setHint('');
 
   el.drawer.classList.add('open');
   el.scrim.classList.add('open');
-  drawerOpen = true;
-  el.itemTitle.focus({ preventScroll: true });
+
+  // Opening an existing item to read it shouldn't throw the keyboard up.
+  if (mode === 'add') el.itemTitle.focus({ preventScroll: true });
 }
 
-// Closing saves the item if it has a title, and throws it away if it doesn't.
-function closeDrawer() {
-  if (!drawerOpen) return;
+const openAdd = () => showDrawer('add', null);
+const openEdit = (item) => showDrawer('edit', item);
 
-  const title = el.itemTitle.value.trim();
-  if (title) addItem(title, el.itemBody.value.trim());
-
+function hideDrawer() {
+  clearTimeout(saveTimer);
   el.itemTitle.blur();
   el.itemBody.blur();
   el.drawer.classList.remove('open');
   el.scrim.classList.remove('open');
-  drawerOpen = false;
+  drawer = null;
+}
+
+// Copies what's in the fields onto the item. A blank title becomes "Untitled".
+function readEdits(item) {
+  item.title = el.itemTitle.value.trim() || 'Untitled';
+  item.body = el.itemBody.value.trimEnd();
+  item.updatedAt = Date.now();
+}
+
+// Edits are saved as you type, a moment after you pause.
+function saveEdit() {
+  clearTimeout(saveTimer);
+  if (drawer?.mode !== 'edit') return;
+  readEdits(drawer.item);
+  db.put('items', drawer.item).catch(console.error);
+}
+
+const scheduleSave = () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveEdit, 300);
+};
+
+// Adding: saves if there is a title, throws it away if there isn't.
+// Editing: saves whatever is in the fields.
+function closeDrawer() {
+  if (!drawer) return;
+
+  if (drawer.mode === 'add') {
+    const title = el.itemTitle.value.trim();
+    if (title) addItem(title, el.itemBody.value.trim());
+  } else {
+    readEdits(drawer.item);
+    db.put('items', drawer.item).catch(console.error);
+    render();
+  }
+  hideDrawer();
 }
 
 el.add.addEventListener('click', openAdd);
 el.scrim.addEventListener('click', closeDrawer);
 
 el.done.addEventListener('click', () => {
-  if (!el.itemTitle.value.trim()) {
+  if (drawer?.mode === 'add' && !el.itemTitle.value.trim()) {
     setHint('Enter a title first', true);
     el.itemTitle.focus();
     return;
@@ -186,7 +264,11 @@ el.done.addEventListener('click', () => {
   closeDrawer();
 });
 
-el.itemTitle.addEventListener('input', () => setHint(''));
+el.itemTitle.addEventListener('input', () => {
+  setHint('');
+  scheduleSave();
+});
+el.itemBody.addEventListener('input', scheduleSave);
 
 // Enter in the title moves to the description instead of submitting.
 el.itemTitle.addEventListener('keydown', (e) => {
@@ -198,6 +280,30 @@ el.itemTitle.addEventListener('keydown', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeDrawer();
+});
+
+// A phone can kill the page the moment you switch apps, so save straight away.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) saveEdit();
+});
+
+/* ---------- deleting an item ---------- */
+
+el.trash.addEventListener('click', () => {
+  if (drawer?.mode !== 'edit') return;
+  const item = drawer.item;
+  readEdits(item); // so Undo brings back the latest text
+
+  state.items = state.items.filter((i) => i.id !== item.id);
+  db.remove('items', item.id).catch(console.error);
+  hideDrawer();
+  render();
+
+  showToast('Item deleted', () => {
+    state.items.push(item);
+    db.put('items', item).catch(console.error);
+    render();
+  });
 });
 
 /* ---------- start ---------- */
