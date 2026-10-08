@@ -45,12 +45,29 @@
 
     <main class="list" id="list" role="list"></main>
 
-    <button class="add-bar">
+    <!-- <button class="add-bar" id="add">
       <span>Add an item</span>
       <span class="add-go">
         <svg class="icon"><use href="#i-plus"/></svg>
       </span>
+    </button> -->
+    <button class="fab" id="add" aria-label="Add an item">
+        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
     </button>
   </div>
+
+    <div class="scrim" id="scrim"></div>
+    <section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="New item">
+        <div class="grab"><span></span></div>
+        <div class="drawer-top">
+            <span class="chip" id="chip"></span>
+        </div>
+        <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
+        <textarea id="item-body" placeholder="Add a description"></textarea>
+        <div class="drawer-foot" id="drawer-foot">
+            <span id="hint"></span>
+            <button id="done">Add</button>
+        </div>
+    </section>
 </body>
 </html>

@@ -3,7 +3,19 @@ import * as db from './db.js';
 window.db = db; // temporary, for experimenting in the console
 
 const $ = (id) => document.getElementById(id);
-const el = { title: $('title'), list: $('list') };
+const el = {
+  title: $('title'),
+  list: $('list'),
+  add: $('add'),
+  scrim: $('scrim'),
+  drawer: $('drawer'),
+  chip: $('chip'),
+  itemTitle: $('item-title'),
+  itemBody: $('item-body'),
+  foot: $('drawer-foot'),
+  hint: $('hint'),
+  done: $('done'),
+};
 
 // Everything on screen is drawn from this object. IndexedDB is the saved copy.
 const state = { lists: [], items: [], current: 0 };
@@ -71,7 +83,8 @@ function renderRow(item) {
 function renderEmpty() {
   const p = document.createElement('p');
   p.className = 'empty';
-  p.textContent = 'Start your list. Tap Add an item.';
+//   p.textContent = 'Start your list. Tap Add an item.';
+  p.textContent = 'Start your list. Tap the plus to add an item.';
   return p;
 }
 
@@ -98,6 +111,93 @@ el.list.addEventListener('click', (e) => {
   item.updatedAt = Date.now();
   render();                                   // update the screen first
   db.put('items', item).catch(console.error); // then save it
+});
+
+/* ---------- adding an item ---------- */
+
+function addItem(title, body) {
+  const list = state.lists[state.current];
+  const siblings = itemsOf(list.id);
+  const now = Date.now();
+
+  const item = {
+    id: db.uid(),
+    listId: list.id,
+    title,
+    body,
+    done: false,
+    // Last item's order plus one. Using the count instead would collide
+    // once an item in the middle has been deleted.
+    order: siblings.length ? siblings[siblings.length - 1].order + 1 : 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.items.push(item);
+  render();
+  el.list.scrollTop = el.list.scrollHeight; // bring the new item into view
+  db.put('items', item).catch(console.error);
+}
+
+/* ---------- the drawer ---------- */
+
+let drawerOpen = false;
+
+function setHint(message, isError = false) {
+  el.hint.textContent = message;
+  el.foot.classList.toggle('error', isError);
+}
+
+function openAdd() {
+  el.chip.textContent = state.lists[state.current].name;
+  el.itemTitle.value = '';
+  el.itemBody.value = '';
+  setHint('');
+
+  el.drawer.classList.add('open');
+  el.scrim.classList.add('open');
+  drawerOpen = true;
+  el.itemTitle.focus({ preventScroll: true });
+}
+
+// Closing saves the item if it has a title, and throws it away if it doesn't.
+function closeDrawer() {
+  if (!drawerOpen) return;
+
+  const title = el.itemTitle.value.trim();
+  if (title) addItem(title, el.itemBody.value.trim());
+
+  el.itemTitle.blur();
+  el.itemBody.blur();
+  el.drawer.classList.remove('open');
+  el.scrim.classList.remove('open');
+  drawerOpen = false;
+}
+
+el.add.addEventListener('click', openAdd);
+el.scrim.addEventListener('click', closeDrawer);
+
+el.done.addEventListener('click', () => {
+  if (!el.itemTitle.value.trim()) {
+    setHint('Enter a title first', true);
+    el.itemTitle.focus();
+    return;
+  }
+  closeDrawer();
+});
+
+el.itemTitle.addEventListener('input', () => setHint(''));
+
+// Enter in the title moves to the description instead of submitting.
+el.itemTitle.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    el.itemBody.focus();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDrawer();
 });
 
 /* ---------- start ---------- */
