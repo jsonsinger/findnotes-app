@@ -1,0 +1,62 @@
+// Storage layer for Find Notes: thin promise wrappers over IndexedDB.
+const DB_NAME = 'find-notes';
+const DB_VERSION = 1;
+
+let dbPromise;
+
+export function openDB() {
+  dbPromise ??= new Promise((resolve, reject) => {
+    if (!globalThis.indexedDB) {
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    // Runs for a brand new database, and again whenever DB_VERSION goes up.
+    request.onupgradeneeded = (event) => {
+      const db = request.result;
+      if (event.oldVersion < 1) {
+        db.createObjectStore('lists', { keyPath: 'id' });
+        db.createObjectStore('items', { keyPath: 'id' }).createIndex('listId', 'listId');
+        db.createObjectStore('versions', { keyPath: 'id' }).createIndex('itemId', 'itemId');
+      }
+      // Later schema changes go here, for example:
+      // if (event.oldVersion < 2) { ... }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return dbPromise;
+}
+
+// Runs one transaction. `work` receives the transaction and returns a request
+// (or nothing). We resolve on tx.oncomplete, which means "committed".
+async function run(storeNames, mode, work) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeNames, mode);
+    const request = work(tx);
+    tx.oncomplete = () => resolve(request?.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+export const getAll = (store) =>
+  run(store, 'readonly', (tx) => tx.objectStore(store).getAll());
+
+export const getByIndex = (store, index, key) =>
+  run(store, 'readonly', (tx) => tx.objectStore(store).index(index).getAll(key));
+
+// put() creates the record, or replaces it if the id already exists.
+export const put = (store, record) =>
+  run(store, 'readwrite', (tx) => tx.objectStore(store).put(record));
+
+export const remove = (store, id) =>
+  run(store, 'readwrite', (tx) => tx.objectStore(store).delete(id));
+
+export const uid = () =>
+  globalThis.crypto?.randomUUID
+    ? crypto.randomUUID()
+    : 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
