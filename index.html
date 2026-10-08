@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Find Notes</title>
+  <meta name="description" content="Lists that can grow into notes.">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <!-- Icon sprite: define each icon once, reuse it with <use> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-flame" viewBox="0 0 24 24">
+      <path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+      <circle cx="10" cy="10" r="6.5"/><path d="M20 20l-5.2-5.2"/>
+    </symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24">
+      <circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"/>
+    </symbol>
+  </svg>
+
+  <div id="app">
+    <header class="header">
+      <span class="tile">
+        <svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg>
+      </span>
+      <h1 id="title">Find Notes</h1>
+      <button class="icon-btn" aria-label="Search">
+        <svg class="icon"><use href="#i-search"/></svg>
+      </button>
+      <button class="icon-btn" aria-label="List options">
+        <svg class="icon"><use href="#i-dots"/></svg>
+      </button>
+    </header>
+
+    <main class="list">
+      <p class="empty">Start your list. Tap Add an item.</p>
+    </main>
+
+    <button class="add-bar">
+      <span>Add an item</span>
+      <span class="add-go">
+        <svg class="icon"><use href="#i-plus"/></svg>
+      </span>
+    </button>
+  </div>
+</body>
+</html>
