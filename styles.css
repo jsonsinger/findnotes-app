@@ -127,6 +127,7 @@ h1, h2 {
   overflow-y: auto;
   /* room to scroll the last item clear of the floating button */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  touch-action: pan-y; /* the browser keeps vertical scrolling, we handle sideways swipes */
 }
 
 .empty {
@@ -522,6 +523,48 @@ h1, h2 {
 .all-row.new {
   justify-content: flex-start;
   color: var(--accent);
+}
+
+/* Dots: which list you are on, centred beside the plus button */
+.dots {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  display: flex;
+  align-items: center;
+  height: 44px;
+  z-index: 3;
+}
+
+.dot {
+  width: 22px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.dot::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.dot[aria-current='true']::before {
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  opacity: 1;
+}
+
+.dots-count {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
