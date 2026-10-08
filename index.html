@@ -7,7 +7,6 @@
   <meta name="description" content="Lists that can grow into notes.">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
-  <script type="module" src="app.js"></script>
 </head>
 <body>
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
@@ -38,10 +37,11 @@
         <svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg>
       </span>
       <h1 id="title">Find Notes</h1>
+      <input class="title-input" id="title-input" type="text" maxlength="40" aria-label="List name" autocomplete="off" enterkeyhint="done" hidden>
       <button class="icon-btn" aria-label="Search">
         <svg class="icon"><use href="#i-search"/></svg>
       </button>
-      <button class="icon-btn" aria-label="List options">
+      <button class="icon-btn" id="menu-btn" aria-label="List options" aria-haspopup="true" aria-expanded="false">
         <svg class="icon"><use href="#i-dots"/></svg>
       </button>
     </header>
@@ -57,7 +57,6 @@
     <button class="fab" id="add" aria-label="Add an item">
         <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
     </button>
-  </div>
 
     <div class="scrim" id="scrim"></div>
     <section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="New item">
@@ -77,6 +76,29 @@
             <button id="done">Add</button>
         </div>
     </section>
+       <div class="menu-scrim" id="menu-scrim" hidden></div>
+   <div class="menu" id="menu" hidden>
+     <button data-action="all">All lists</button>
+     <button data-action="new">New list</button>
+     <button data-action="rename">Rename list</button>
+     <button data-action="delete" class="danger">Delete list</button>
+   </div>
+
+   <section class="screen" id="all-lists" aria-label="All lists" hidden>
+     <header class="header">
+       <h2>All lists</h2>
+     </header>
+     <div class="screen-body">
+       <div id="all-rows"></div>
+       <button class="all-row new" id="all-new">
+         <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+         <span>New list</span>
+       </button>
+     </div>
+   </section>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>

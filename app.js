@@ -5,6 +5,7 @@ window.db = db; // temporary, for experimenting in the console
 const $ = (id) => document.getElementById(id);
 const el = {
   title: $('title'),
+  titleInput: $('title-input'),
   list: $('list'),
   add: $('add'),
   scrim: $('scrim'),
@@ -17,15 +18,44 @@ const el = {
   hint: $('hint'),
   done: $('done'),
   toast: $('toast'),
+  menuBtn: $('menu-btn'),
+  menuScrim: $('menu-scrim'),
+  menu: $('menu'),
+  allLists: $('all-lists'),
+  allRows: $('all-rows'),
+  allNew: $('all-new'),
 };
 
 // Everything on screen is drawn from this object. IndexedDB is the saved copy.
-const state = { lists: [], items: [], current: 0 };
+const state = { lists: [], items: [], currentId: null };
+
+// Find the list by id. An index would shift whenever a list is deleted.
+const currentList = () => state.lists.find((l) => l.id === state.currentId);
 
 const itemsOf = (listId) =>
   state.items.filter((i) => i.listId === listId).sort((a, b) => a.order - b.order);
 
 const firstLine = (text) => text.split('\n').find((line) => line.trim()) || '';
+
+/* ---------- remembering the last list ---------- */
+
+// Which list you were looking at is a per-device habit, not part of your
+// data, so it lives in localStorage rather than IndexedDB (and not in exports).
+const LAST_LIST_KEY = 'find-notes:last-list';
+
+function rememberList(id) {
+  try { localStorage.setItem(LAST_LIST_KEY, id); } catch { /* storage blocked */ }
+}
+
+function recallList() {
+  try { return localStorage.getItem(LAST_LIST_KEY); } catch { return null; }
+}
+
+function switchTo(id) {
+  state.currentId = id;
+  rememberList(id);
+  render();
+}
 
 /* ---------- loading ---------- */
 
@@ -90,7 +120,7 @@ function renderEmpty() {
 }
 
 function render() {
-  const list = state.lists[state.current];
+  const list = currentList();
   el.title.textContent = list.name;
 
   const items = itemsOf(list.id);
@@ -121,7 +151,7 @@ el.list.addEventListener('click', (e) => {
 /* ---------- adding an item ---------- */
 
 function addItem(title, body) {
-  const list = state.lists[state.current];
+  const list = currentList();
   const siblings = itemsOf(list.id);
   const now = Date.now();
 
@@ -153,7 +183,7 @@ function hideToast() {
   el.toast.classList.remove('show');
 }
 
-function showToast(message, onUndo) {
+function showToast(message, onUndo, ms = 4000) {
   clearTimeout(toastTimer);
 
   const text = document.createElement('span');
@@ -171,7 +201,7 @@ function showToast(message, onUndo) {
   }
 
   el.toast.classList.add('show');
-  toastTimer = setTimeout(hideToast, 4000);
+  toastTimer = setTimeout(hideToast, ms);
 }
 
 /* ---------- the drawer ---------- */
@@ -189,7 +219,7 @@ function showDrawer(mode, item) {
   drawer = { mode, item };
   hideToast();
 
-  el.chip.textContent = state.lists[state.current].name;
+  el.chip.textContent = currentList().name;
   el.itemTitle.value = item ? item.title : '';
   el.itemBody.value = item ? item.body : '';
   el.trash.hidden = mode !== 'edit';
@@ -278,8 +308,12 @@ el.itemTitle.addEventListener('keydown', (e) => {
   }
 });
 
+// Escape closes whatever is on top: the menu, then All lists, then the drawer.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeDrawer();
+  if (e.key !== 'Escape') return;
+  if (!el.menu.hidden) closeMenu(true);
+  else if (!el.allLists.hidden) closeAll();
+  else closeDrawer();
 });
 
 // A phone can kill the page the moment you switch apps, so save straight away.
@@ -306,6 +340,147 @@ el.trash.addEventListener('click', () => {
   });
 });
 
+/* ---------- the three-dots menu ---------- */
+
+function openMenu() {
+  // You can't delete your only list, so say so by greying it out.
+  el.menu.querySelector('[data-action="delete"]').disabled = state.lists.length < 2;
+  el.menu.hidden = false;
+  el.menuScrim.hidden = false;
+  el.menuBtn.setAttribute('aria-expanded', 'true');
+  el.menu.querySelector('button').focus();
+}
+
+function closeMenu(returnFocus = false) {
+  el.menu.hidden = true;
+  el.menuScrim.hidden = true;
+  el.menuBtn.setAttribute('aria-expanded', 'false');
+  if (returnFocus) el.menuBtn.focus();
+}
+
+el.menuBtn.addEventListener('click', openMenu);
+el.menuScrim.addEventListener('click', () => closeMenu(true));
+
+el.menu.addEventListener('click', (e) => {
+  const action = e.target.closest('button')?.dataset.action;
+  if (!action) return;
+  closeMenu();
+  ({ all: openAll, new: newList, rename: startRename, delete: deleteList })[action]();
+});
+
+/* ---------- the All lists screen ---------- */
+
+function renderAll() {
+  const rows = state.lists.map((list) => {
+    const open = itemsOf(list.id).filter((i) => !i.done).length;
+
+    const row = document.createElement('button');
+    row.className = 'all-row' + (list.id === state.currentId ? ' current' : '');
+    row.dataset.id = list.id;
+    if (list.id === state.currentId) row.setAttribute('aria-current', 'true');
+    row.innerHTML = '<span class="all-name"></span><span class="all-count"></span>';
+    row.querySelector('.all-name').textContent = list.name;
+    row.querySelector('.all-count').textContent = `${open} open`;
+    return row;
+  });
+  el.allRows.replaceChildren(...rows);
+}
+
+function openAll() {
+  renderAll();
+  el.allLists.hidden = false;
+  el.allRows.querySelector('.current')?.focus();
+}
+
+function closeAll() {
+  el.allLists.hidden = true;
+}
+
+el.allRows.addEventListener('click', (e) => {
+  const row = e.target.closest('.all-row');
+  if (!row) return;
+  switchTo(row.dataset.id);
+  closeAll();
+});
+
+el.allNew.addEventListener('click', () => {
+  closeAll();
+  newList();
+});
+
+/* ---------- new, rename and delete a list ---------- */
+
+function newList() {
+  const last = state.lists[state.lists.length - 1];
+  const list = { id: db.uid(), name: 'New list', order: last ? last.order + 1 : 0 };
+  state.lists.push(list);
+  db.put('lists', list).catch(console.error);
+  switchTo(list.id);
+  startRename(); // a new list almost always needs a name
+}
+
+// While renaming, the title is swapped for an input of the same size.
+let renaming = false;
+
+function startRename() {
+  renaming = true;
+  el.titleInput.value = currentList().name;
+  el.title.hidden = true;
+  el.titleInput.hidden = false;
+  el.titleInput.focus();
+  el.titleInput.select();
+}
+
+function finishRename(save) {
+  if (!renaming) return; // Enter and the blur it causes both land here
+  renaming = false;
+
+  const list = currentList();
+  const name = el.titleInput.value.trim();
+  if (save && name && name !== list.name) {
+    list.name = name;
+    db.put('lists', list).catch(console.error);
+  }
+  el.titleInput.hidden = true;
+  el.title.hidden = false;
+  render();
+}
+
+el.titleInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') finishRename(true);
+  if (e.key === 'Escape') finishRename(false);
+});
+el.titleInput.addEventListener('blur', () => finishRename(true));
+
+function deleteList() {
+  if (state.lists.length < 2) {
+    showToast('Keep at least one list');
+    return;
+  }
+
+  const list = currentList();
+  const index = state.lists.indexOf(list);
+  const removedItems = itemsOf(list.id);
+
+  state.lists.splice(index, 1);
+  state.items = state.items.filter((i) => i.listId !== list.id);
+  db.remove('lists', list.id).catch(console.error);
+  for (const item of removedItems) db.remove('items', item.id).catch(console.error);
+
+  // Land on the list that took its place, or the new last one.
+  switchTo(state.lists[Math.min(index, state.lists.length - 1)].id);
+
+  // A whole list is a bigger loss than one item, so Undo stays a bit longer.
+  showToast('List deleted', () => {
+    state.lists.push(list);
+    state.lists.sort((a, b) => a.order - b.order);
+    state.items.push(...removedItems);
+    db.put('lists', list).catch(console.error);
+    for (const item of removedItems) db.put('items', item).catch(console.error);
+    switchTo(list.id);
+  }, 6000);
+}
+
 /* ---------- start ---------- */
 
 async function init() {
@@ -314,6 +489,11 @@ async function init() {
     await seed();
     await load();
   }
+
+  const remembered = recallList();
+  state.currentId = state.lists.some((l) => l.id === remembered)
+    ? remembered
+    : state.lists[0].id;
   render();
 }
 

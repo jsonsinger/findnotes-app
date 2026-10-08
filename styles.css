@@ -74,7 +74,7 @@ button {
   min-height: 56px;
 }
 
-h1 {
+h1, h2 {
   flex: 1;
   min-width: 0;
   font-size: 22px;
@@ -417,6 +417,111 @@ h1 {
   font-weight: 500;
   color: var(--toast-action);
   padding: 8px 0 8px 16px;
+}
+
+/* Renaming: the title swaps for an input of the same size */
+.title-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 500;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1.5px solid var(--accent);
+  border-radius: 0;
+  outline: 0;
+  padding: 0 0 2px;
+}
+
+/* Three-dots menu */
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 7; /* transparent, only there to catch outside taps */
+}
+
+.menu {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  right: 12px;
+  width: 200px;
+  padding: 6px 0;
+  background: var(--surface);
+  border: 0.5px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 8;
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 16px;
+}
+
+.menu button.danger {
+  color: var(--danger);
+}
+
+.menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* All lists: a full screen laid over the app */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  z-index: 7;
+}
+
+.screen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.all-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 20px;
+  border-top: 0.5px solid var(--line);
+  font-size: 16px;
+}
+
+.all-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.all-count {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.all-row.current .all-name {
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.all-row.new {
+  justify-content: flex-start;
+  color: var(--accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
