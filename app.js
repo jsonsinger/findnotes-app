@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   title: $('title'),
   titleInput: $('title-input'),
+  stage: $('stage'),
   list: $('list'),
   add: $('add'),
   scrim: $('scrim'),
@@ -57,6 +58,7 @@ function switchTo(id) {
   state.currentId = id;
   rememberList(id);
   render();
+  el.list.scrollTop = 0; // every list opens at its top
 }
 
 /* ---------- loading ---------- */
@@ -535,56 +537,78 @@ const ms = (time) => (reducedMotion() ? 0 : time);
 
 let animating = false;
 
-// Slide the old list away, swap in the new one, slide it in.
-// direction 1 = towards the next list (content moves left), -1 = towards the previous.
-// `from` is how far the finger had already dragged the list.
-async function slideTo(target, direction, from = 0) {
+// A pane is a throwaway copy of another list. It waits off-screen beside the
+// real list, so you can see it arrive while you swipe.
+function buildPane(list) {
+  const pane = document.createElement('div');
+  pane.className = 'list pane';
+  pane.setAttribute('aria-hidden', 'true');
+  pane.inert = true; // not focusable or clickable, it is only a picture
+  const items = itemsOf(list.id);
+  pane.replaceChildren(...(items.length ? items.map(renderRow) : [renderEmpty()]));
+  el.stage.append(pane);
+  return pane;
+}
+
+// A track is the current list plus its panes. Each has a slot: 0 is the list you
+// are on, -1 the screen to its left, 1 the screen to its right.
+function placeTrack(track, x) {
+  const width = el.stage.offsetWidth;
+  for (const { node, slot } of track) node.style.transform = `translateX(${x + slot * width}px)`;
+}
+
+function clearTrack(track) {
+  for (const { node } of track) node.style.transform = '';
+}
+
+// Slide the whole track from one position to another.
+function settle(track, from, to) {
+  const width = el.stage.offsetWidth;
+  const animations = track.map(({ node, slot }) => node.animate(
+    [
+      { transform: `translateX(${from + slot * width}px)` },
+      { transform: `translateX(${to + slot * width}px)` },
+    ],
+    { duration: ms(200), easing: 'ease-out', fill: 'forwards' },
+  ));
+  return Promise.all(animations.map((a) => a.finished)).then(() => animations);
+}
+
+// Throw the panes away. Everything happens in one go, so there is no flash.
+function endTrack(track, animations) {
+  for (const { node } of track) if (node !== el.list) node.remove();
+  animations.forEach((a) => a.cancel());
+}
+
+// direction 1 = towards the next list (content moves left), -1 = the previous.
+// `from` is how far the finger had already dragged. A swipe passes in the track it
+// built while dragging. A tap on a dot has none, so one pane is built for it.
+async function slideTo(target, direction, from = 0, track = null) {
   if (animating) return;
   animating = true;
 
-  const travel = el.list.offsetWidth * 0.4;
-  el.list.style.transform = '';
+  track ??= [{ node: el.list, slot: 0 }, { node: buildPane(target), slot: direction }];
+  clearTrack(track);
 
-  const out = el.list.animate(
-    [
-      { transform: `translateX(${from}px)`, opacity: 1 },
-      { transform: `translateX(${-direction * travel}px)`, opacity: 0 },
-    ],
-    { duration: ms(140), easing: 'ease-in', fill: 'forwards' },
-  );
-  await out.finished;
-
-  switchTo(target.id);
-
-  const incoming = el.list.animate(
-    [
-      { transform: `translateX(${direction * travel}px)`, opacity: 0 },
-      { transform: 'none', opacity: 1 },
-    ],
-    { duration: ms(180), easing: 'ease-out' },
-  );
-  out.cancel(); // the new animation is already running, so there is no flash
-  await incoming.finished;
+  const animations = await settle(track, from, -direction * el.stage.offsetWidth);
+  switchTo(target.id); // now the real list shows the target, exactly where the pane was
+  endTrack(track, animations);
   animating = false;
 }
 
-// Too short a drag: the list springs back.
-async function snapBack(from) {
+// Too short a drag: everything springs back.
+async function snapBack(track, from) {
   animating = true;
-  el.list.style.transform = '';
-  await el.list.animate(
-    [{ transform: `translateX(${from}px)` }, { transform: 'none' }],
-    { duration: ms(150), easing: 'ease-out' },
-  ).finished;
+  clearTrack(track);
+  const animations = await settle(track, from, 0);
+  endTrack(track, animations);
   animating = false;
 }
 
-// Next or previous, wrapping round at either end.
-function goBy(step, from = 0) {
+const neighbour = (step) => {
   const n = state.lists.length;
-  if (n < 2) return;
-  slideTo(state.lists[(currentIndex() + step + n) % n], step, from);
-}
+  return state.lists[(currentIndex() + step + n) % n];
+};
 
 /* ---------- swiping ---------- */
 
@@ -592,13 +616,13 @@ const SWIPE_LOCK = 10;     // px before we decide which way the finger is going
 const SWIPE_DISTANCE = 50; // px to count as a swipe
 const EDGE = 24;           // iOS uses the screen edge for "back", so leave it alone
 
-let swipe = null; // { id, x, y, time, dx, locked }
+let swipe = null; // { id, x, y, time, dx, locked, track }
 let justSwiped = false;
 
 el.list.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse' || animating || state.lists.length < 2) return;
   if (e.clientX < EDGE || e.clientX > window.innerWidth - EDGE) return;
-  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, time: e.timeStamp, dx: 0, locked: false };
+  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, time: e.timeStamp, dx: 0, locked: false, track: null };
 });
 
 el.list.addEventListener('pointermove', (e) => {
@@ -610,17 +634,25 @@ el.list.addEventListener('pointermove', (e) => {
     // Mostly vertical: that's the user scrolling, not swiping. Let it go.
     if (Math.abs(dy) > SWIPE_LOCK && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; }
     if (Math.abs(dx) < SWIPE_LOCK) return;
+
     swipe.locked = true;
     el.list.setPointerCapture(e.pointerId);
+    // Now we know it's a swipe, put both neighbours in place.
+    swipe.track = [
+      { node: el.list, slot: 0 },
+      { node: buildPane(neighbour(-1)), slot: -1 },
+      { node: buildPane(neighbour(1)), slot: 1 },
+    ];
   }
 
-  swipe.dx = dx;
-  el.list.style.transform = `translateX(${dx}px)`; // the list follows the finger
+  const width = el.stage.offsetWidth;
+  swipe.dx = Math.max(-width, Math.min(width, dx));
+  placeTrack(swipe.track, swipe.dx); // everything follows the finger
 });
 
 el.list.addEventListener('pointerup', (e) => {
   if (!swipe || e.pointerId !== swipe.id) return;
-  const { dx, locked, time } = swipe;
+  const { dx, locked, time, track } = swipe;
   swipe = null;
   if (!locked) return; // just a tap, the click handler deals with it
 
@@ -630,12 +662,16 @@ el.list.addEventListener('pointerup', (e) => {
 
   const quick = e.timeStamp - time < 220;
   const far = Math.abs(dx) > SWIPE_DISTANCE || (quick && Math.abs(dx) > 24); // a flick counts too
-  if (far) goBy(dx < 0 ? 1 : -1, dx);
-  else snapBack(dx);
+  if (far) {
+    const direction = dx < 0 ? 1 : -1;
+    slideTo(neighbour(direction), direction, dx, track);
+  } else {
+    snapBack(track, dx);
+  }
 });
 
 el.list.addEventListener('pointercancel', () => {
-  if (swipe?.locked) snapBack(swipe.dx);
+  if (swipe?.locked) snapBack(swipe.track, swipe.dx);
   swipe = null;
 });
 

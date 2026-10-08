@@ -121,13 +121,27 @@ h1, h2 {
   flex: none;
 }
 
-.list {
+/* The stage holds the current list and, while swiping, its neighbours */
+.stage {
+  position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+.list {
+  position: absolute;
+  inset: 0;
+  touch-action: pan-y; /* the browser keeps vertical scrolling, we handle sideways swipes */
   overflow-y: auto;
+  background: var(--bg);
   /* room to scroll the last item clear of the floating button */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
-  touch-action: pan-y; /* the browser keeps vertical scrolling, we handle sideways swipes */
+}
+
+/* A throwaway copy of a neighbouring list, only there during a swipe */
+.pane {
+  pointer-events: none;
 }
 
 .empty {
