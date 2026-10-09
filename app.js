@@ -1,4 +1,5 @@
 import * as db from './db.js';
+import { createEditor, plainText } from './editor.js';
 
 window.db = db; // temporary, for experimenting in the console
 
@@ -216,7 +217,7 @@ function renderRow(item) {
   row.querySelector('.row-title').textContent = item.title;
 
   const sub = row.querySelector('.row-sub');
-  const preview = firstLine(item.body);
+  const preview = firstLine(plainText(item.body));
   if (preview) sub.textContent = preview;
   else sub.remove();
 
@@ -427,6 +428,13 @@ measure.className = 'measure';
 measure.setAttribute('aria-hidden', 'true');
 el.drawer.append(measure);
 
+// The description is a small rich-text editor that saves plain Markdown (see editor.js).
+const editor = createEditor(el.itemBody, {
+  onChange: () => { updateKind(); updateTrash(); scheduleSave(); },
+  onSelection: () => syncToolbar(),
+});
+const getBody = () => editor.getMarkdown();
+
 const PEEK_LINES = 3;
 function linesOf(text) {
   measure.style.width = el.itemBody.clientWidth + 'px';
@@ -436,7 +444,7 @@ function linesOf(text) {
 
 // Whether the description has outgrown the small sheet. (Stories will build on this later.)
 function updateKind() {
-  story = linesOf(el.itemBody.value) > PEEK_LINES;
+  story = linesOf(plainText(getBody())) > PEEK_LINES;
   syncMeta();
   refreshHint();
 }
@@ -460,10 +468,28 @@ function updateTrash() {
   if (!drawer) return;
   const adding = drawer.mode === 'add';
   // Only a new note has a bin (clear the draft). Archiving happens from the list, not inside a note.
-  el.trash.hidden = !adding || (!el.itemTitle.value.trim() && !el.itemBody.value.trim());
+  el.trash.hidden = !adding || (!el.itemTitle.value.trim() && editor.isEmpty());
   el.trash.setAttribute('aria-label', adding ? 'Clear draft' : 'Archive item');
   el.trashIcon.setAttribute('href', adding ? '#i-trash' : '#i-archive');
 }
+
+// The formatting bar above the keyboard. Its buttons must not take focus from the text.
+const fmtButtons = [...document.querySelectorAll('#fmtbar [data-cmd]')];
+function syncToolbar() {
+  if (!drawer) return;
+  const { type, bold, italic } = editor.state();
+  const on = { h: type === 'h', b: bold, i: italic, li: type === 'li', task: type === 'task' };
+  for (const b of fmtButtons) b.setAttribute('aria-pressed', String(!!on[b.dataset.cmd]));
+}
+for (const eventName of ['pointerdown', 'mousedown']) {
+  $('fmtbar').addEventListener(eventName, (e) => e.preventDefault());
+}
+$('fmtbar').addEventListener('click', (e) => {
+  const cmd = e.target.closest('[data-cmd]')?.dataset.cmd;
+  if (!cmd || !drawer) return;
+  if (cmd === 'b' || cmd === 'i') editor.toggleInline(cmd); else editor.toggleType(cmd);
+  syncToolbar();
+});
 
 function setBookmark(on) {
   el.bookmark.setAttribute('aria-pressed', String(on));
@@ -483,7 +509,8 @@ function showDrawer(mode, item) {
   const draft = mode === 'add' ? readDraft() : null; // an unfinished note comes back
   if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.savedAt = draft.t; }
   el.itemTitle.value = item ? item.title : draft?.title ?? '';
-  el.itemBody.value = item ? item.body : draft?.body ?? '';
+  editor.setMarkdown(item ? item.body : draft?.body ?? '');
+  drawer.canon = getBody(); // the saved text may differ from its tidied form; that alone is not an edit
   updateTrash();
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
@@ -534,7 +561,7 @@ function hideDrawer() {
 // Copies what's in the fields onto the item. A blank title becomes "Untitled".
 function readEdits(item) {
   item.title = el.itemTitle.value.trim() || 'Untitled';
-  item.body = el.itemBody.value.trimEnd();
+  item.body = getBody().trimEnd();
   item.bookmarked = drawer ? drawer.bookmarked : !!item.bookmarked;
   item.updatedAt = Date.now();
 }
@@ -544,7 +571,7 @@ function saveEdit() {
   cancelSave();
   if (drawer?.mode === 'add') {
     const title = el.itemTitle.value;
-    const body = el.itemBody.value;
+    const body = getBody();
     const empty = !title.trim() && !body.trim();
     writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
@@ -556,6 +583,7 @@ function saveEdit() {
   drawer.pending = false;
   // Swiping down now only throws away what was typed after this save.
   drawer.original = { title: drawer.item.title, body: drawer.item.body, updatedAt: drawer.item.updatedAt };
+  drawer.canon = drawer.item.body;
   drawer.savedAt = Date.now();
   updateCommit();
   refreshHint();
@@ -578,7 +606,7 @@ function closeDrawer() {
   if (drawer.mode === 'add') {
     const title = el.itemTitle.value.trim();
     if (title) {
-      addItem(title, el.itemBody.value.trim(), { bookmarked: drawer.bookmarked });
+      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked });
       writeDraft(null);
     }
   } else {
@@ -606,11 +634,6 @@ el.itemTitle.addEventListener('input', () => {
   updateTrash();
   scheduleSave();
 });
-el.itemBody.addEventListener('input', () => {
-  updateKind();
-  updateTrash();
-  scheduleSave();
-});
 
 el.bookmark.addEventListener('click', () => {
   if (!drawer) return;
@@ -628,7 +651,7 @@ el.bookmark.addEventListener('click', () => {
 el.itemTitle.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    el.itemBody.focus({ preventScroll: true }); // a scrolled page is what broke the sheet
+    editor.caretToStart(); // a scrolled page is what broke the sheet, so no scrolling here
   }
 });
 
@@ -851,7 +874,7 @@ function dismissDrawer() {
   const { mode, item, original } = drawer;
   cancelSave();
   const title = el.itemTitle.value;
-  const body = el.itemBody.value;
+  const body = getBody();
   const bookmarked = drawer.bookmarked;
 
   if (mode === 'add') {
@@ -861,7 +884,7 @@ function dismissDrawer() {
   }
 
   const edited = { title: title.trim() || 'Untitled', body: body.trimEnd() };
-  if (edited.title === original.title && edited.body === original.body) {
+  if (edited.title === original.title && edited.body === drawer.canon) {
     hideDrawer();
     return;
   }
@@ -885,7 +908,7 @@ el.trash.addEventListener('click', () => {
     cancelSave();
     writeDraft(null);
     el.itemTitle.value = '';
-    el.itemBody.value = '';
+    editor.setMarkdown('');
     drawer.bookmarked = false;
     drawer.savedAt = 0;
     setBookmark(false);
@@ -1671,7 +1694,7 @@ function searchItems(query) {
   const results = [];
   for (const item of state.items) {
     const title = fold(item.title);
-    const body = fold(item.body || '');
+    const body = fold(plainText(item.body || ''));
     if (!terms.every((t) => title.includes(t) || body.includes(t))) continue;
     results.push({ item, terms, inTitle: terms.some((t) => title.includes(t)) });
   }
@@ -1736,7 +1759,7 @@ function renderSearch() {
     row.innerHTML = '<span class="search-title"></span><span class="search-snippet"></span><span class="search-where"></span>';
     highlight(row.querySelector('.search-title'), item.title, terms);
     const sub = row.querySelector('.search-snippet');
-    const text = snippet(item.body || '', terms);
+    const text = snippet(plainText(item.body || ''), terms);
     if (text) highlight(sub, text, terms); else sub.remove();
     const list = state.lists.find((l) => l.id === item.listId);
     row.querySelector('.search-where').textContent = list ? list.name : '';

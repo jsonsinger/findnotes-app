@@ -41,6 +41,8 @@
     <symbol id="i-back" viewBox="0 0 24 24">
         <path d="M15 5l-7 7 7 7"/>
     </symbol>
+    <symbol id="i-bullets" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/></g><g fill="currentColor"><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></g></symbol>
+    <symbol id="i-task" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12.3l2.7 2.7L16.2 9.4"/></g></symbol>
     <symbol id="i-close" viewBox="0 0 24 24">
         <path d="M6 6l12 12M18 6L6 18"/>
     </symbol>
@@ -155,7 +157,14 @@
             <span id="meta-list"></span>
             <span id="meta-date"></span>
         </div>
-        <textarea id="item-body" placeholder="Add a description"></textarea>
+        <div id="item-body" aria-label="Description"></div>
+        <div class="fmtbar" id="fmtbar" role="toolbar" aria-label="Formatting">
+            <button data-cmd="h" aria-label="Heading" aria-pressed="false"><span class="fmt-h">H<sub>2</sub></span></button>
+            <button data-cmd="b" aria-label="Bold" aria-pressed="false"><span class="fmt-b">B</span></button>
+            <button data-cmd="i" aria-label="Italic" aria-pressed="false"><span class="fmt-i">I</span></button>
+            <button data-cmd="li" aria-label="Bulleted list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bullets"/></svg></button>
+            <button data-cmd="task" aria-label="Tick box list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-task"/></svg></button>
+        </div>
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
    <div class="menu" id="menu" hidden>

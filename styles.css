@@ -587,7 +587,136 @@ h1, h2 {
   min-height: 48px;
   font-size: 16px;
   line-height: 1.5;
+  overflow-y: auto;
+  padding-bottom: 12px;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  caret-color: var(--accent);
 }
+
+/* With the formatting bar showing there has to be room under the last line */
+.drawer.show-meta #item-body {
+  padding-bottom: 76px;
+}
+
+/* The blocks the editor builds: paragraph, heading, bullet, tick box */
+#item-body .b {
+  position: relative;
+  min-height: 24px;
+}
+
+#item-body .b.h {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 8px 0 2px;
+}
+
+#item-body .b.li,
+#item-body .b.task {
+  padding-left: 30px;
+}
+
+#item-body .b.li::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+#item-body .b.task::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 6px;
+}
+
+#item-body .b.task[data-done]::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+#item-body .b.task[data-done]::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 6px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+#item-body .b.task[data-done] {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+#item-body.is-empty .b:first-child::before {
+  content: 'Add a description';
+  position: absolute;
+  left: 0;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* The formatting bar: floats just above the keyboard once the note is full size */
+.fmtbar {
+  display: none;
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  height: 52px;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 6px;
+  border-radius: 26px;
+  background: var(--tile-bg);
+  box-shadow: var(--shadow-popover);
+  z-index: 2;
+}
+
+.drawer.show-meta .fmtbar {
+  display: flex;
+}
+
+.fmtbar button {
+  flex: 1;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  border-radius: 22px;
+  font-size: 18px;
+}
+
+.fmtbar button[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.fmtbar .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.fmt-h { font-weight: 600; }
+.fmt-h sub { font-size: 11px; vertical-align: baseline; position: relative; top: 3px; }
+.fmt-b { font-weight: 700; }
+.fmt-i { font-style: italic; font-family: Georgia, serif; font-size: 20px; }
 
 #item-title::placeholder,
 #item-body::placeholder {
