@@ -26,7 +26,11 @@ export function openDB() {
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  }).catch((error) => {
+    dbPromise = undefined; // don't cache a failure, or "try again" could never work
+    throw error;
   });
+
   return dbPromise;
 }
 
@@ -36,10 +40,19 @@ async function run(storeNames, mode, work) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeNames, mode);
-    const request = work(tx);
+    let request;
     tx.oncomplete = () => resolve(request?.result);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
+
+    try {
+      request = work(tx);
+    } catch (error) {
+      // If a write throws part-way, the ones before it would still commit.
+      // Abort so a batch really is all or nothing.
+      reject(error);
+      tx.abort();
+    }
   });
 }
 
@@ -55,6 +68,18 @@ export const put = (store, record) =>
 
 export const remove = (store, id) =>
   run(store, 'readwrite', (tx) => tx.objectStore(store).delete(id));
+
+// Several writes in ONE transaction: they all happen, or none of them do.
+// put: [[store, record], ...]   remove: [[store, id], ...]
+export function batch({ put: puts = [], remove: removes = [] }) {
+  const stores = [...new Set([...puts, ...removes].map(([store]) => store))];
+  if (!stores.length) return Promise.resolve();
+
+  return run(stores, 'readwrite', (tx) => {
+    for (const [store, record] of puts) tx.objectStore(store).put(record);
+    for (const [store, id] of removes) tx.objectStore(store).delete(id);
+  });
+}
 
 export const uid = () =>
   globalThis.crypto?.randomUUID

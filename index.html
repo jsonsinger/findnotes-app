@@ -32,7 +32,7 @@
   </svg>
 
   <div id="app">
-    <header class="header">
+    <header class="header" id="header">
       <span class="tile">
         <svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg>
       </span>
@@ -46,38 +46,37 @@
       </button>
     </header>
 
+    <div class="banner" id="banner" role="alert" hidden>
+      <span id="banner-text"></span>
+      <button id="banner-action"></button>
+    </div>
+
     <div class="stage" id="stage">
         <main class="list" id="list" role="list"></main>
     </div>
     <nav class="dots" id="dots" aria-label="Lists" hidden></nav>
 
-    <!-- <button class="add-bar" id="add">
-      <span>Add an item</span>
-      <span class="add-go">
-        <svg class="icon"><use href="#i-plus"/></svg>
-      </span>
-    </button> -->
     <button class="fab" id="add" aria-label="Add an item">
         <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
     </button>
 
     <div class="scrim" id="scrim"></div>
     <section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="New item">
-        <div class="grab"><span></span></div>
-        <div class="drawer-top">
+        <button class="grab" id="grab" aria-label="Expand note" aria-expanded="false"><span></span></button>
+        <div class="drawer-top" id="drawer-top">
             <span class="chip" id="chip"></span>
+            <span id="hint"></span>
             <span class="drawer-actions">
                 <button class="icon-btn" id="trash" aria-label="Delete item" hidden>
                 <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
                 </button>
             </span>
         </div>
-        <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
-        <textarea id="item-body" placeholder="Add a description"></textarea>
-        <div class="drawer-foot" id="drawer-foot">
-            <span id="hint"></span>
-            <button id="done">Add</button>
+        <div class="title-row">
+            <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
+            <button id="done" aria-label="Add"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></button>
         </div>
+        <textarea id="item-body" placeholder="Add a description"></textarea>
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
    <div class="menu" id="menu" hidden>
@@ -87,7 +86,7 @@
      <button data-action="delete" class="danger">Delete list</button>
    </div>
 
-   <section class="screen" id="all-lists" aria-label="All lists" hidden>
+   <section class="screen" id="all-lists" role="dialog" aria-modal="true" aria-label="All lists" hidden>
      <header class="header">
        <h2>All lists</h2>
      </header>

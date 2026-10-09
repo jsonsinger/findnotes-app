@@ -2,8 +2,24 @@ import * as db from './db.js';
 
 window.db = db; // temporary, for experimenting in the console
 
+// Temporary: show errors on screen, so a phone without a console can still tell us what broke.
+// A bare "Script error." usually means the phone mixed old and new files after an update.
+function showCrash(message) {
+  console.error(message);
+  const opaque = !message || /^script error/i.test(message);
+  showBanner(
+    opaque ? 'Find Notes has been updated. Reload to get the latest version.' : `Something went wrong: ${message}`,
+    'Reload',
+    () => location.reload(),
+  );
+}
+addEventListener('error', (e) => showCrash(e.message));
+addEventListener('unhandledrejection', (e) => showCrash(e.reason?.message ?? String(e.reason)));
+
 const $ = (id) => document.getElementById(id);
 const el = {
+  app: $('app'),
+  grab: $('grab'),
   title: $('title'),
   titleInput: $('title-input'),
   stage: $('stage'),
@@ -15,7 +31,7 @@ const el = {
   trash: $('trash'),
   itemTitle: $('item-title'),
   itemBody: $('item-body'),
-  foot: $('drawer-foot'),
+  foot: $('drawer-top'),
   hint: $('hint'),
   done: $('done'),
   toast: $('toast'),
@@ -26,6 +42,10 @@ const el = {
   allRows: $('all-rows'),
   allNew: $('all-new'),
   dots: $('dots'),
+  header: $('header'),
+  banner: $('banner'),
+  bannerText: $('banner-text'),
+  bannerAction: $('banner-action'),
 };
 
 // Everything on screen is drawn from this object. IndexedDB is the saved copy.
@@ -38,6 +58,48 @@ const itemsOf = (listId) =>
   state.items.filter((i) => i.listId === listId).sort((a, b) => a.order - b.order);
 
 const firstLine = (text) => text.split('\n').find((line) => line.trim()) || '';
+
+/* ---------- when saving goes wrong ---------- */
+
+function showBanner(message, actionLabel, onAction) {
+  el.bannerText.textContent = message;
+  el.bannerAction.textContent = actionLabel;
+  el.bannerAction.onclick = onAction;
+  el.banner.hidden = false;
+}
+
+// true when IndexedDB wouldn't even open: the app runs from memory only
+let memoryOnly = false;
+let saveFailed = false;
+
+// Every write goes through here. The screen has already changed (see "optimistic
+// update"), so if the save fails the person has to be told, not left guessing.
+function save(write) {
+  return write.then(
+    () => {
+      if (saveFailed) { // a later save worked, so the problem has gone away
+        saveFailed = false;
+        el.banner.hidden = true;
+      }
+    },
+    (error) => {
+      console.error(error);
+      if (memoryOnly) return; // already warned at start-up
+      saveFailed = true;
+      const reason = error?.name === 'QuotaExceededError'
+        ? 'This device is out of storage space.'
+        : "Couldn't save your last change.";
+      showBanner(`${reason} It may be lost if you close the app.`, 'Try again', saveEverything);
+    },
+  );
+}
+
+// "Try again": write everything on screen back to the database in one go.
+function saveEverything() {
+  return save(db.batch({
+    put: [...state.lists.map((l) => ['lists', l]), ...state.items.map((i) => ['items', i])],
+  }));
+}
 
 /* ---------- remembering the last list ---------- */
 
@@ -147,7 +209,7 @@ el.list.addEventListener('click', (e) => {
     item.done = !item.done;
     item.updatedAt = Date.now();
     render();                                   // update the screen first
-    db.put('items', item).catch(console.error); // then save it
+    save(db.put('items', item)); // then save it
   } else if (e.target.closest('.row-text')) {
     openEdit(item);
   }
@@ -176,7 +238,38 @@ function addItem(title, body) {
   state.items.push(item);
   render();
   el.list.scrollTop = el.list.scrollHeight; // bring the new item into view
-  db.put('items', item).catch(console.error);
+  save(db.put('items', item));
+}
+
+/* ---------- keeping the background out of reach ---------- */
+
+// While the drawer, the menu or All lists is open, everything behind it is "inert":
+// it can't be tapped, tabbed to, or read out by a screen reader.
+const behind = () => [el.header, el.banner, el.stage, el.dots, el.add];
+
+let opener = null; // whatever had focus when the overlay opened
+
+function lockBackground() {
+  opener = document.activeElement;
+  for (const node of behind()) node.inert = true;
+}
+
+function unlockBackground() {
+  for (const node of behind()) node.inert = false;
+}
+
+// Hand focus back to where it was. The list is rebuilt after an edit, so the old
+// button may be gone. In that case find the same row's new button.
+function restoreFocus() {
+  const node = opener;
+  opener = null;
+  if (!node) return;
+
+  const rowId = node.closest?.('.row')?.dataset.id;
+  const target = node.isConnected
+    ? node
+    : rowId && el.list.querySelector(`.row[data-id="${rowId}"] .row-text`);
+  target?.focus({ preventScroll: true });
 }
 
 /* ---------- toast with undo ---------- */
@@ -221,22 +314,30 @@ function setHint(message, isError = false) {
 }
 
 function showDrawer(mode, item) {
-  drawer = { mode, item };
+  // `original` is what the item looked like when it opened, so a swipe-down can put it back
+  drawer = { mode, item, original: item && { title: item.title, body: item.body, updatedAt: item.updatedAt } };
   hideToast();
 
   el.chip.textContent = currentList().name;
   el.itemTitle.value = item ? item.title : '';
   el.itemBody.value = item ? item.body : '';
   el.trash.hidden = mode !== 'edit';
-  el.done.textContent = mode === 'add' ? 'Add' : 'Done';
+  el.done.setAttribute('aria-label', mode === 'add' ? 'Add' : 'Done');
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
   setHint('');
 
+  lockBackground();
+  el.drawer.classList.remove('closing');
+  el.scrim.classList.remove('closing');
   el.drawer.classList.add('open');
   el.scrim.classList.add('open');
+  fitViewport();
+  animateSheet(PEEK);
 
-  // Opening an existing item to read it shouldn't throw the keyboard up.
+  // Opening an existing item to read it shouldn't throw the keyboard up, so focus
+  // the Done button there instead of a text field.
   if (mode === 'add') el.itemTitle.focus({ preventScroll: true });
+  else el.done.focus({ preventScroll: true });
 }
 
 const openAdd = () => showDrawer('add', null);
@@ -246,9 +347,19 @@ function hideDrawer() {
   clearTimeout(saveTimer);
   el.itemTitle.blur();
   el.itemBody.blur();
-  el.drawer.classList.remove('open');
-  el.scrim.classList.remove('open');
+  drag = null;
   drawer = null;
+  unlockBackground();
+  restoreFocus();
+
+  // Slide away. The app is usable straight away, the sheet just finishes leaving.
+  el.drawer.classList.add('closing');
+  el.scrim.classList.add('closing');
+  animateSheet(0).then((finished) => {
+    if (!finished) return; // something else (opening again) took over
+    el.drawer.classList.remove('open', 'closing');
+    el.scrim.classList.remove('open', 'closing');
+  });
 }
 
 // Copies what's in the fields onto the item. A blank title becomes "Untitled".
@@ -263,7 +374,7 @@ function saveEdit() {
   clearTimeout(saveTimer);
   if (drawer?.mode !== 'edit') return;
   readEdits(drawer.item);
-  db.put('items', drawer.item).catch(console.error);
+  save(db.put('items', drawer.item));
 }
 
 const scheduleSave = () => {
@@ -271,8 +382,7 @@ const scheduleSave = () => {
   saveTimer = setTimeout(saveEdit, 300);
 };
 
-// Adding: saves if there is a title, throws it away if there isn't.
-// Editing: saves whatever is in the fields.
+// Done: keeps what you typed. Adding needs a title, editing saves the fields.
 function closeDrawer() {
   if (!drawer) return;
 
@@ -281,14 +391,14 @@ function closeDrawer() {
     if (title) addItem(title, el.itemBody.value.trim());
   } else {
     readEdits(drawer.item);
-    db.put('items', drawer.item).catch(console.error);
+    save(db.put('items', drawer.item));
     render();
   }
   hideDrawer();
 }
 
 el.add.addEventListener('click', openAdd);
-el.scrim.addEventListener('click', closeDrawer);
+el.scrim.addEventListener('click', dismissDrawer);
 
 el.done.addEventListener('click', () => {
   if (drawer?.mode === 'add' && !el.itemTitle.value.trim()) {
@@ -313,18 +423,220 @@ el.itemTitle.addEventListener('keydown', (e) => {
   }
 });
 
-// Escape closes whatever is on top: the menu, then All lists, then the drawer.
+// Escape closes whatever is on top: the menu, then All lists, then the drawer
+// (which discards, like swiping it down).
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (!el.menu.hidden) closeMenu(true);
+  if (!el.menu.hidden) closeMenu();
   else if (!el.allLists.hidden) closeAll();
-  else closeDrawer();
+  else dismissDrawer();
 });
 
 // A phone can kill the page the moment you switch apps, so save straight away.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) saveEdit();
 });
+
+/* ---------- the sheet: dragging, snapping, keyboard ---------- */
+
+// Three resting heights: closed (0), small (PEEK) and the whole screen (fullHeight()).
+const PEEK = 250;
+const vv = window.visualViewport;
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let sheetH = 0;   // how many pixels of the sheet are showing right now
+let sheetAnim = 0; // bumped to cancel a running animation
+let drag = null;
+let lastDragEnd = 0;
+
+// The tallest the sheet can be: the app, or what is left above the keyboard.
+const fullHeight = () => Math.max(PEEK, Math.min(el.app.clientHeight, vv ? vv.height : innerHeight));
+
+// One function positions the sheet for every state: dragging, animating, resting.
+function setSheet(h) {
+  sheetH = h;
+  const full = fullHeight();
+  el.drawer.style.height = Math.max(h, PEEK) + 'px';
+  el.drawer.style.transform = h < PEEK ? `translateY(${PEEK - h}px)` : '';
+  el.drawer.style.setProperty('--full', clamp((h - PEEK) / (full - PEEK || 1), 0, 1).toFixed(3));
+  el.scrim.style.opacity = Math.min(1, h / PEEK).toFixed(3);
+
+  const expanded = String(h > (PEEK + full) / 2);
+  if (el.grab.getAttribute('aria-expanded') !== expanded) {
+    el.grab.setAttribute('aria-expanded', expanded);
+    el.grab.setAttribute('aria-label', expanded === 'true' ? 'Make note smaller' : 'Expand note');
+  }
+}
+
+// Glide to a height. Resolves true when it arrives, false if something interrupted it.
+function animateSheet(to) {
+  const id = ++sheetAnim;
+  const from = sheetH;
+  const ms = Math.min(300, 140 + Math.abs(to - from) * 0.5);
+  return new Promise((resolve) => {
+    if (from === to || prefersReducedMotion()) {
+      setSheet(to);
+      resolve(true);
+      return;
+    }
+    const start = performance.now();
+    const step = (now) => {
+      if (id !== sheetAnim) return resolve(false);
+      const t = Math.min(1, (now - start) / ms);
+      setSheet(from + (to - from) * (1 - (1 - t) ** 3)); // ease out: fast, then settles
+      if (t < 1) requestAnimationFrame(step);
+      else resolve(true);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+// When the keyboard opens, the whole app shrinks to the space above it, so the sheet
+// (which sits at the bottom of the app) needs no keyboard maths of its own. On an
+// iPhone the browser also pans the page; the transform undoes that.
+let lastFull = 0;
+let wasKeyboard = false;
+let settleTimer = 0;
+const typingInSheet = () =>
+  !!drawer && (document.activeElement === el.itemTitle || document.activeElement === el.itemBody);
+
+function fitViewport(settled) {
+  const keyboard = !!vv && innerHeight - vv.height > 120;
+
+  // Moving from the title to the description makes the browser report "no keyboard" for a
+  // moment. While a field has focus, wait and see before believing it.
+  clearTimeout(settleTimer);
+  if (!keyboard && wasKeyboard && settled !== true && typingInSheet()) {
+    settleTimer = setTimeout(() => fitViewport(true), 300);
+    return;
+  }
+
+  el.app.style.height = keyboard ? vv.height + 'px' : '';
+  el.app.style.transform = keyboard && vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+  el.drawer.classList.toggle('kb', keyboard);
+
+  const full = fullHeight();
+  if (drawer && !drag) {
+    // A full-page sheet stays full-page, just above the keyboard instead of behind it.
+    const wasFull = lastFull > PEEK && sheetH >= lastFull - 2;
+    const target = wasFull ? full : Math.min(sheetH, full);
+    if (keyboard !== wasKeyboard) animateSheet(target); // glide as the keyboard comes or goes
+    else setSheet(target);
+  }
+  lastFull = full;
+  wasKeyboard = keyboard;
+}
+// When focus leaves the fields the keyboard really is going away, so re-check.
+el.drawer.addEventListener('focusout', () => setTimeout(() => fitViewport(true), 200));
+vv?.addEventListener('resize', fitViewport);
+vv?.addEventListener('scroll', fitViewport);
+addEventListener('resize', fitViewport);
+
+// Dragging starts on the handle or the top row, never on the text fields,
+// so selecting text and scrolling a long note still work.
+el.drawer.addEventListener('pointerdown', (e) => {
+  if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
+  drag = { id: e.pointerId, y: e.clientY, h: sheetH, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
+});
+
+el.drawer.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved) {
+    if (Math.abs(drag.y - e.clientY) < 6) return; // still might be a tap
+    drag.moved = true;
+    sheetAnim++; // stop any animation under the finger
+    drag.y = e.clientY;
+    drag.h = sheetH;
+    el.drawer.setPointerCapture(e.pointerId);
+  }
+  setSheet(clamp(drag.h + (drag.y - e.clientY), 0, fullHeight()));
+
+  // Keep roughly the last 100ms of movement to measure how fast the finger was going.
+  drag.samples.push({ y: e.clientY, t: e.timeStamp });
+  while (drag.samples.length > 2 && e.timeStamp - drag.samples[0].t > 100) drag.samples.shift();
+});
+
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag;
+  drag = null;
+  if (!d.moved) return; // a tap, the click handler deals with it
+  lastDragEnd = performance.now();
+
+  const first = d.samples[0];
+  const last = d.samples[d.samples.length - 1];
+  const velocity = last.t > first.t ? (first.y - last.y) / (last.t - first.t) : 0; // px/ms, up is positive
+  const full = fullHeight();
+  const stops = [0, PEEK, full];
+
+  let target;
+  if (e.type === 'pointercancel') {
+    target = sheetH < PEEK ? 0 : PEEK;
+  } else if (Math.abs(velocity) > 0.5) {
+    // A flick moves one stop in its direction, however short the drag was.
+    target = velocity > 0
+      ? stops.find((s) => s > sheetH + 1) ?? full
+      : [...stops].reverse().find((s) => s < sheetH - 1) ?? 0;
+  } else if (sheetH < PEEK * 0.75) {
+    target = 0;
+  } else {
+    target = Math.abs(sheetH - PEEK) <= Math.abs(sheetH - full) ? PEEK : full;
+  }
+
+  if (target === 0) dismissDrawer();
+  else animateSheet(target);
+}
+// While the sheet is open, a finger moving over anything but the description must not
+// scroll the page (on an iPhone that pulls down to refresh the app).
+document.addEventListener('touchmove', (e) => {
+  if (drawer && !e.target.closest('#item-body')) e.preventDefault();
+}, { passive: false });
+
+el.drawer.addEventListener('pointerup', endDrag);
+el.drawer.addEventListener('pointercancel', endDrag);
+
+// Tapping the handle toggles between small and full.
+el.grab.addEventListener('click', () => {
+  if (performance.now() - lastDragEnd < 400) return; // that was the end of a drag
+  animateSheet(sheetH > (PEEK + fullHeight()) / 2 ? PEEK : fullHeight());
+});
+
+// Dismissing (swipe down, tap outside, Escape) throws the edits away. Done keeps them.
+// Undo is offered because a stray swipe shouldn't cost you a note.
+function dismissDrawer() {
+  if (!drawer) return;
+  const { mode, item, original } = drawer;
+  clearTimeout(saveTimer);
+  const title = el.itemTitle.value;
+  const body = el.itemBody.value;
+
+  if (mode === 'add') {
+    hideDrawer();
+    if (title.trim() || body.trim()) {
+      showToast('Note discarded', () => addItem(title.trim() || 'Untitled', body.trim()));
+    }
+    return;
+  }
+
+  const edited = { title: title.trim() || 'Untitled', body: body.trimEnd() };
+  if (edited.title === original.title && edited.body === original.body) {
+    hideDrawer();
+    return;
+  }
+
+  // Autosave may already have written the edits, so put the original back.
+  Object.assign(item, original);
+  save(db.put('items', item));
+  render();
+  hideDrawer();
+  showToast('Changes discarded', () => {
+    Object.assign(item, edited, { updatedAt: Date.now() });
+    save(db.put('items', item));
+    render();
+  });
+}
 
 /* ---------- deleting an item ---------- */
 
@@ -334,13 +646,13 @@ el.trash.addEventListener('click', () => {
   readEdits(item); // so Undo brings back the latest text
 
   state.items = state.items.filter((i) => i.id !== item.id);
-  db.remove('items', item.id).catch(console.error);
+  save(db.remove('items', item.id));
   hideDrawer();
   render();
 
   showToast('Item deleted', () => {
     state.items.push(item);
-    db.put('items', item).catch(console.error);
+    save(db.put('items', item));
     render();
   });
 });
@@ -350,21 +662,23 @@ el.trash.addEventListener('click', () => {
 function openMenu() {
   // You can't delete your only list, so say so by greying it out.
   el.menu.querySelector('[data-action="delete"]').disabled = state.lists.length < 2;
+  lockBackground();
   el.menu.hidden = false;
   el.menuScrim.hidden = false;
   el.menuBtn.setAttribute('aria-expanded', 'true');
   el.menu.querySelector('button').focus();
 }
 
-function closeMenu(returnFocus = false) {
+function closeMenu() {
   el.menu.hidden = true;
   el.menuScrim.hidden = true;
   el.menuBtn.setAttribute('aria-expanded', 'false');
-  if (returnFocus) el.menuBtn.focus();
+  unlockBackground();
+  restoreFocus(); // back on the three-dots button, ready for whatever the menu does next
 }
 
 el.menuBtn.addEventListener('click', openMenu);
-el.menuScrim.addEventListener('click', () => closeMenu(true));
+el.menuScrim.addEventListener('click', closeMenu);
 
 el.menu.addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
@@ -393,12 +707,15 @@ function renderAll() {
 
 function openAll() {
   renderAll();
+  lockBackground();
   el.allLists.hidden = false;
   el.allRows.querySelector('.current')?.focus();
 }
 
 function closeAll() {
   el.allLists.hidden = true;
+  unlockBackground();
+  restoreFocus();
 }
 
 el.allRows.addEventListener('click', (e) => {
@@ -419,7 +736,7 @@ function newList() {
   const last = state.lists[state.lists.length - 1];
   const list = { id: db.uid(), name: 'New list', order: last ? last.order + 1 : 0 };
   state.lists.push(list);
-  db.put('lists', list).catch(console.error);
+  save(db.put('lists', list));
   switchTo(list.id);
   startRename(); // a new list almost always needs a name
 }
@@ -436,15 +753,15 @@ function startRename() {
   el.titleInput.select();
 }
 
-function finishRename(save) {
+function finishRename(keep) {
   if (!renaming) return; // Enter and the blur it causes both land here
   renaming = false;
 
   const list = currentList();
   const name = el.titleInput.value.trim();
-  if (save && name && name !== list.name) {
+  if (keep && name && name !== list.name) {
     list.name = name;
-    db.put('lists', list).catch(console.error);
+    save(db.put('lists', list));
   }
   el.titleInput.hidden = true;
   el.title.hidden = false;
@@ -469,8 +786,10 @@ function deleteList() {
 
   state.lists.splice(index, 1);
   state.items = state.items.filter((i) => i.listId !== list.id);
-  db.remove('lists', list.id).catch(console.error);
-  for (const item of removedItems) db.remove('items', item.id).catch(console.error);
+  // One transaction: the list and its items go together, or not at all.
+  save(db.batch({
+    remove: [['lists', list.id], ...removedItems.map((i) => ['items', i.id])],
+  }));
 
   // Land on the list that took its place, or the new last one.
   switchTo(state.lists[Math.min(index, state.lists.length - 1)].id);
@@ -480,8 +799,9 @@ function deleteList() {
     state.lists.push(list);
     state.lists.sort((a, b) => a.order - b.order);
     state.items.push(...removedItems);
-    db.put('lists', list).catch(console.error);
-    for (const item of removedItems) db.put('items', item).catch(console.error);
+    save(db.batch({
+      put: [['lists', list], ...removedItems.map((i) => ['items', i])],
+    }));
     switchTo(list.id);
   }, 6000);
 }
@@ -583,26 +903,44 @@ function endTrack(track, animations) {
 // direction 1 = towards the next list (content moves left), -1 = the previous.
 // `from` is how far the finger had already dragged. A swipe passes in the track it
 // built while dragging. A tap on a dot has none, so one pane is built for it.
+// async function slideTo(target, direction, from = 0, track = null) {
+//   if (animating) return;
+//   animating = true;
+
+//   track ??= [{ node: el.list, slot: 0 }, { node: buildPane(target), slot: direction }];
+//   clearTrack(track);
+
+//   const animations = await settle(track, from, -direction * el.stage.offsetWidth);
+//   switchTo(target.id); // now the real list shows the target, exactly where the pane was
+//   endTrack(track, animations);
+//   animating = false;
+// }
+
 async function slideTo(target, direction, from = 0, track = null) {
-  if (animating) return;
-  animating = true;
-
-  track ??= [{ node: el.list, slot: 0 }, { node: buildPane(target), slot: direction }];
-  clearTrack(track);
-
-  const animations = await settle(track, from, -direction * el.stage.offsetWidth);
-  switchTo(target.id); // now the real list shows the target, exactly where the pane was
-  endTrack(track, animations);
-  animating = false;
+    if (animating) return;
+    animating = true;
+    try {
+    track ??= [{ node: el.list, slot: 0 }, { node: buildPane(target), slot: direction }];
+    clearTrack(track);
+    const animations = await settle(track, from, -direction * el.stage.offsetWidth);
+    switchTo(target.id);
+    endTrack(track, animations);
+    } finally {
+    animating = false;
+    }
 }
 
 // Too short a drag: everything springs back.
 async function snapBack(track, from) {
+  if (animating) return;
   animating = true;
-  clearTrack(track);
-  const animations = await settle(track, from, 0);
-  endTrack(track, animations);
-  animating = false;
+  try {
+    clearTrack(track);
+    const animations = await settle(track, from, 0);
+    endTrack(track, animations);
+  } finally {
+    animating = false;
+  }
 }
 
 const neighbour = (step) => {
@@ -682,10 +1020,24 @@ el.list.addEventListener('click', (e) => {
 /* ---------- start ---------- */
 
 async function init() {
-  await load();
-  if (!state.lists.length) {
-    await seed();
+  try {
     await load();
+    if (!state.lists.length) {
+      await seed();
+      await load();
+    }
+  } catch (error) {
+    // The database won't open (private browsing, storage blocked, a damaged
+    // database). Open anyway with one empty list in memory, and say so.
+    console.error(error);
+    memoryOnly = true;
+    state.lists = [{ id: db.uid(), name: 'Home', order: 0 }];
+    state.items = [];
+    showBanner(
+      "Can't store notes on this device right now. Anything you add will be lost when you close the app.",
+      'Try again',
+      () => location.reload(),
+    );
   }
 
   const remembered = recallList();
