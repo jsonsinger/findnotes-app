@@ -57,6 +57,11 @@ const el = {
   archive: $('archive'),
   archiveBody: $('archive-body'),
   archiveBack: $('archive-back'),
+  search: $('search'),
+  searchBack: $('search-back'),
+  searchInput: $('search-input'),
+  searchBody: $('search-body'),
+  searchBtn: $('search-btn'),
   settings: $('settings'),
   settingsBack: $('settings-back'),
   trashIcon: $('trash-icon'),
@@ -634,6 +639,7 @@ document.addEventListener('keydown', (e) => {
   if (!el.menu.hidden) closeMenu();
   else if (!el.listEdit.hidden) finishRename(false);
   else if (selection.size && el.archive.hidden && el.allLists.hidden && !drawer) clearSelection();
+  else if (!el.search.hidden) closeSearch();
   else if (!el.settings.hidden) closeSettings();
   else if (!el.archive.hidden) closeArchive();
   else if (!el.allLists.hidden) closeAll();
@@ -1651,6 +1657,124 @@ makeSlider(el.selbar, () => archiveItems(selectedItems()));
 makeSlider(el.editSlide, () => {
   finishRename(true);
   archiveList();
+});
+
+/* ---------- Search: every list at once ---------- */
+
+// Compare without caring about capitals or accents ("cafe" finds "Café").
+const fold = (text) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Every word you type has to appear, in the title or the text. Title matches come first.
+function searchItems(query) {
+  const terms = fold(query).split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  const results = [];
+  for (const item of state.items) {
+    const title = fold(item.title);
+    const body = fold(item.body || '');
+    if (!terms.every((t) => title.includes(t) || body.includes(t))) continue;
+    results.push({ item, terms, inTitle: terms.some((t) => title.includes(t)) });
+  }
+  const rank = (r) => (r.inTitle ? 0 : 1);
+  return results.sort((a, b) => rank(a) - rank(b) || b.item.updatedAt - a.item.updatedAt);
+}
+
+// Write `text` into `node` with the matching words picked out. Folding keeps the same
+// length for plain letters; if a character changes length, fall back to no highlight.
+function highlight(node, text, terms) {
+  const folded = fold(text);
+  if (folded.length !== text.length) { node.textContent = text; return; }
+  const spans = [];
+  for (const t of terms) {
+    for (let i = folded.indexOf(t); i !== -1; i = folded.indexOf(t, i + t.length)) spans.push([i, i + t.length]);
+  }
+  spans.sort((a, b) => a[0] - b[0]);
+  const parts = [];
+  let at = 0;
+  for (const [from, to] of spans) {
+    if (to <= at) continue;
+    const start = Math.max(from, at);
+    if (start > at) parts.push(text.slice(at, start));
+    const mark = document.createElement('mark');
+    mark.textContent = text.slice(start, to);
+    parts.push(mark);
+    at = to;
+  }
+  if (at < text.length) parts.push(text.slice(at));
+  node.replaceChildren(...parts);
+}
+
+// The part of the text around the first match, so you can see why it was found.
+function snippet(body, terms) {
+  const folded = fold(body);
+  if (folded.length !== body.length) return firstLine(body);
+  const hit = terms.map((t) => folded.indexOf(t)).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+  if (hit === undefined) return firstLine(body);
+  const from = Math.max(0, hit - 24);
+  const text = body.slice(from, from + 90).replace(/\s+/g, ' ');
+  return (from > 0 ? '\u2026' : '') + text;
+}
+
+function renderSearch() {
+  const query = el.searchInput.value.trim();
+  if (!query) {
+    el.searchBody.replaceChildren();
+    return;
+  }
+  const found = searchItems(query);
+  if (!found.length) {
+    const none = document.createElement('p');
+    none.className = 'search-empty';
+    none.textContent = `Nothing found for \u201c${query}\u201d`;
+    el.searchBody.replaceChildren(none);
+    return;
+  }
+  el.searchBody.replaceChildren(...found.map(({ item, terms }) => {
+    const row = document.createElement('button');
+    row.className = 'search-row';
+    row.dataset.id = item.id;
+    row.innerHTML = '<span class="search-title"></span><span class="search-snippet"></span><span class="search-where"></span>';
+    highlight(row.querySelector('.search-title'), item.title, terms);
+    const sub = row.querySelector('.search-snippet');
+    const text = snippet(item.body || '', terms);
+    if (text) highlight(sub, text, terms); else sub.remove();
+    const list = state.lists.find((l) => l.id === item.listId);
+    row.querySelector('.search-where').textContent = list ? list.name : '';
+    return row;
+  }));
+}
+
+function openSearch() {
+  if (selection.size) clearSelection();
+  lockBackground();
+  el.search.hidden = false;
+  el.searchInput.value = '';
+  renderSearch();
+  el.searchInput.focus();
+}
+
+function closeSearch() {
+  el.searchInput.blur();
+  el.search.hidden = true;
+  unlockBackground();
+  restoreFocus();
+}
+
+el.searchBtn.addEventListener('click', openSearch);
+el.searchBack.addEventListener('click', closeSearch);
+el.searchInput.addEventListener('input', renderSearch);
+el.searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); el.searchInput.blur(); } // hides the keyboard so you can see the results
+});
+
+// Opening a result takes you to its list and opens the note.
+el.searchBody.addEventListener('click', (e) => {
+  const id = e.target.closest('.search-row')?.dataset.id;
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  closeSearch();
+  if (item.listId !== state.currentId) switchTo(item.listId);
+  openEdit(item);
 });
 
 /* ---------- Settings: theme, backup and about ---------- */
