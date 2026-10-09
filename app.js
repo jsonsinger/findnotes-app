@@ -96,6 +96,21 @@ function plainEntry(item) {
 const plainOf = (item) => plainEntry(item).plain;
 const foldedOf = (item) => (plainEntry(item).folded ??= fold(plainOf(item)));
 
+// Search folds every title on every keystroke; keep that until the title changes too.
+const titleCache = new WeakMap();
+function foldedTitleOf(item) {
+  let entry = titleCache.get(item);
+  if (!entry || entry.title !== item.title) {
+    entry = { title: item.title, folded: fold(item.title) };
+    titleCache.set(item, entry);
+  }
+  return entry.folded;
+}
+
+// A fresh copy of one of the <template> row shapes in index.html. Cloning is cheaper than
+// parsing the same HTML for every row.
+const fromTemplate = (id) => $(id).content.firstElementChild.cloneNode(true);
+
 const rowEl = (id) => el.list.querySelector(`.row[data-id="${CSS.escape(id)}"]`);
 
 /* ---------- when saving goes wrong ---------- */
@@ -204,20 +219,11 @@ async function seed() {
 const selection = new Set(); // ids of the rows picked with a long-press
 
 function renderRow(item) {
-  const row = document.createElement('div');
-  row.className = 'row' + (item.done ? ' done' : '') + (selection.has(item.id) ? ' selected' : '');
+  // Fixed markup from the template. User text is added below with textContent, never innerHTML.
+  const row = fromTemplate('tpl-row');
+  row.classList.toggle('done', !!item.done);
+  row.classList.toggle('selected', selection.has(item.id));
   row.dataset.id = item.id;
-  row.setAttribute('role', 'listitem');
-
-  // Fixed markup only. User text is added below with textContent, never innerHTML.
-  row.innerHTML = `
-    <button class="check" role="checkbox" aria-label="Done">
-      <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
-    </button>
-    <button class="row-text">
-      <span class="row-title"></span>
-      <span class="row-sub"></span>
-    </button>`;
 
   row.querySelector('.check').setAttribute('aria-checked', String(item.done));
   row.querySelector('.row-title').textContent = item.title;
@@ -241,10 +247,10 @@ function renderEmpty(heading = 'A blank page', text = 'Add your first item below
   return box;
 }
 
-// The rows of a list, or the blank-page message.
-function listContent(listId) {
+// The rows of a list, or the blank-page message. `limit` keeps only the first few rows.
+function listContent(listId, limit = Infinity) {
   const items = itemsOf(listId);
-  return items.length ? items.map(renderRow) : [renderEmpty()];
+  return items.length ? items.slice(0, limit).map(renderRow) : [renderEmpty()];
 }
 
 function render() {
@@ -528,6 +534,7 @@ function showDrawer(mode, item) {
   el.scrim.classList.remove('closing');
   el.drawer.classList.add('open');
   el.scrim.classList.add('open');
+  measureFull();
   fitViewport();
   watchViewport();
   animateSheet(PEEK);
@@ -702,8 +709,13 @@ let sheetAnim = 0; // bumped to cancel a running animation
 let drag = null;
 let lastDragEnd = 0;
 
-// The tallest the sheet can be: the app, or what is left above the keyboard.
-const fullHeight = () => Math.max(PEEK, Math.min(el.app.clientHeight, vv ? vv.height : innerHeight));
+// The tallest the sheet can be: the app, or what is left above the keyboard. Reading
+// clientHeight right after moving the sheet forces a layout, so it is measured only when the
+// size can have changed (fitViewport, a resize, opening the drawer or starting a drag) and
+// remembered for every frame in between.
+let fullH = 0;
+const measureFull = () => (fullH = Math.max(PEEK, Math.min(el.app.clientHeight, vv ? vv.height : innerHeight)));
+const fullHeight = () => fullH || measureFull();
 
 // One function positions the sheet for every state: dragging, animating, resting.
 function setSheet(h) {
@@ -778,7 +790,7 @@ function fitViewport(settled) {
   el.app.style.transform = top ? `translateY(${top}px)` : '';
   el.drawer.classList.toggle('kb', keyboard);
 
-  const full = fullHeight();
+  const full = measureFull(); // the app's height may just have changed
   if (drawer && !drag) {
     // A full-page sheet stays full-page, just above the keyboard instead of behind it.
     const wasFull = lastFull > PEEK && sheetH >= lastFull - 2;
@@ -805,13 +817,14 @@ function watchViewport() {
 el.drawer.addEventListener('focusout', () => setTimeout(() => fitViewport(true), 200));
 vv?.addEventListener('resize', fitViewport);
 vv?.addEventListener('scroll', fitViewport);
-addEventListener('resize', fitViewport);
+addEventListener('resize', () => { measureFull(); fitViewport(); });
 
 // Dragging starts on the handle or the top row, never on the text fields,
 // so selecting text and scrolling a long note still work.
 el.drawer.addEventListener('pointerdown', (e) => {
   if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
   if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
+  measureFull();
   drag = { id: e.pointerId, y: e.clientY, h: sheetH, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
 });
 
@@ -994,17 +1007,18 @@ el.menu.addEventListener('click', (e) => {
 /* ---------- the All lists screen ---------- */
 
 function renderAll() {
+  // Count the open items of every list in one pass, rather than one pass per list.
+  const openCount = new Map();
+  for (const item of state.items) {
+    if (!item.done) openCount.set(item.listId, (openCount.get(item.listId) ?? 0) + 1);
+  }
   const rows = state.lists.map((list) => {
-    const open = itemsOf(list.id).filter((i) => !i.done).length;
+    const open = openCount.get(list.id) ?? 0;
 
-    const row = document.createElement('button');
-    row.className = 'all-row' + (list.id === state.currentId ? ' current' : '');
+    const row = fromTemplate('tpl-all-row');
+    row.classList.toggle('current', list.id === state.currentId);
     row.dataset.id = list.id;
     if (list.id === state.currentId) row.setAttribute('aria-current', 'true');
-    row.innerHTML = `
-      <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
-      <span class="all-name"></span>
-      <span class="all-count"></span>`;
     row.querySelector('use').setAttribute('href', iconHref(list));
     row.querySelector('.all-name').textContent = list.name;
     row.querySelector('.all-count').textContent = String(open);
@@ -1049,11 +1063,9 @@ let renaming = false;
 
 function buildIconGrid() {
   el.iconGrid.replaceChildren(...LIST_ICONS.map((name) => {
-    const b = document.createElement('button');
+    const b = fromTemplate('tpl-icon-choice');
     b.dataset.icon = name;
-    b.setAttribute('role', 'radio');
     b.setAttribute('aria-label', name);
-    b.innerHTML = '<svg class="icon" aria-hidden="true"><use href=""/></svg>';
     b.querySelector('use').setAttribute('href', `#i-${name}`);
     return b;
   }));
@@ -1163,15 +1175,9 @@ const listNameOf = (id) =>
   [...state.lists, ...state.archive.lists].find((l) => l.id === id)?.name ?? 'Deleted list';
 
 function archiveRow(kind, record) {
-  const row = document.createElement('div');
-  row.className = 'arch-row';
+  const row = fromTemplate('tpl-arch-row');
   row.dataset.kind = kind;
   row.dataset.id = record.id;
-  row.innerHTML = `
-    <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
-    <span class="arch-text"><span class="arch-name"></span><span class="arch-sub"></span></span>
-    <button class="icon-btn" data-act="restore"><svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg></button>
-    <button class="icon-btn" data-act="delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>`;
   const name = kind === 'list' ? record.name : record.title;
   row.querySelector('.arch-name').textContent = name;
   const when = ago(record.archivedAt);
@@ -1306,13 +1312,17 @@ const ms = (time) => (prefersReducedMotion() ? 0 : time);
 let animating = false;
 
 // A pane is a throwaway copy of another list. It waits off-screen beside the
-// real list, so you can see it arrive while you swipe.
+// real list, so you can see it arrive while you swipe. It always shows the top of the
+// list, so only the rows that fit are built (a row is never shorter than its 44px tick).
+const ROW_MIN = 44;
+
 function buildPane(list) {
+  const fits = Math.ceil(el.stage.clientHeight / ROW_MIN) + 1;
   const pane = document.createElement('div');
   pane.className = 'list pane';
   pane.setAttribute('aria-hidden', 'true');
   pane.inert = true; // not focusable or clickable, it is only a picture
-  pane.replaceChildren(...listContent(list.id));
+  pane.replaceChildren(...listContent(list.id, fits));
   el.stage.append(pane);
   return pane;
 }
@@ -1690,7 +1700,7 @@ function searchItems(query) {
   if (!terms.length) return [];
   const results = [];
   for (const item of state.items) {
-    const title = fold(item.title);
+    const title = foldedTitleOf(item);
     const body = foldedOf(item);
     if (!terms.every((t) => title.includes(t) || body.includes(t))) continue;
     results.push({ item, terms, inTitle: terms.some((t) => title.includes(t)) });
@@ -1750,10 +1760,8 @@ function renderSearch() {
     return;
   }
   el.searchBody.replaceChildren(...found.map(({ item, terms }) => {
-    const row = document.createElement('button');
-    row.className = 'search-row';
+    const row = fromTemplate('tpl-search-row');
     row.dataset.id = item.id;
-    row.innerHTML = '<span class="search-title"></span><span class="search-snippet"></span><span class="search-where"></span>';
     highlight(row.querySelector('.search-title'), item.title, terms);
     const sub = row.querySelector('.search-snippet');
     const text = snippet(plainOf(item), terms);

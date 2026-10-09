@@ -16,6 +16,10 @@
   <meta name="apple-mobile-web-app-title" content="Find Notes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="styles.css">
+  <!-- Fetch all the modules at once, instead of finding db.js and editor.js only after app.js has loaded -->
+  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="db.js">
+  <link rel="modulepreload" href="editor.js">
 </head>
 <body>
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
@@ -260,6 +264,40 @@
    </section>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
+
+  <!-- Row shapes, cloned by app.js. Fixed markup only: user text is added with textContent. -->
+  <template id="tpl-row">
+    <div class="row" role="listitem">
+      <button class="check" role="checkbox" aria-label="Done">
+        <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
+      </button>
+      <button class="row-text">
+        <span class="row-title"></span>
+        <span class="row-sub"></span>
+      </button>
+    </div>
+  </template>
+  <template id="tpl-all-row">
+    <button class="all-row">
+      <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+      <span class="all-name"></span>
+      <span class="all-count"></span>
+    </button>
+  </template>
+  <template id="tpl-arch-row">
+    <div class="arch-row">
+      <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+      <span class="arch-text"><span class="arch-name"></span><span class="arch-sub"></span></span>
+      <button class="icon-btn" data-act="restore"><svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg></button>
+      <button class="icon-btn" data-act="delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
+    </div>
+  </template>
+  <template id="tpl-search-row">
+    <button class="search-row"><span class="search-title"></span><span class="search-snippet"></span><span class="search-where"></span></button>
+  </template>
+  <template id="tpl-icon-choice">
+    <button role="radio"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></button>
+  </template>
 
   <script type="module" src="app.js"></script>
 </body>
