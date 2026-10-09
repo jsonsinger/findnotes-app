@@ -55,6 +55,9 @@
 
 html, body { overscroll-behavior: none; overflow: hidden; height: 100%; }
 
+/* The icon sprite at the top of index.html takes no space */
+.sprite { position: absolute; }
+
 #item-title, #item-body { scrollbar-width: none; }
 #item-title::-webkit-scrollbar, #item-body::-webkit-scrollbar { display: none; }
 

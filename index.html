@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- Only this site's own files may load or run: no inline scripts, nothing from elsewhere. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Find Notes</title>
   <meta name="description" content="Lists that can grow into notes.">
   <meta name="color-scheme" content="dark">
-  <script>try{if(localStorage.getItem("find-notes:theme")==="light")document.documentElement.dataset.theme="light"}catch{}</script>
+  <script src="theme.js"></script>
   <meta name="theme-color" content="#171716">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
@@ -23,7 +25,7 @@
 </head>
 <body>
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <svg class="sprite" width="0" height="0" aria-hidden="true">
     <symbol id="i-flame" viewBox="0 0 24 24">
       <path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
     </symbol>

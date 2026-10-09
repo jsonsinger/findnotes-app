@@ -312,6 +312,7 @@ function addItem(title, body, extras = {}) {
   render();
   el.list.scrollTop = el.list.scrollHeight; // bring the new item into view
   save(db.put('items', item));
+  askToPersist();
 }
 
 /* ---------- keeping the background out of reach ---------- */
@@ -1842,9 +1843,15 @@ function appVersion() {
   });
 }
 
-// Ask the browser not to clear our storage when the device is short of space.
+// Ask the browser not to clear our storage when the device is short of space. Firefox shows a
+// prompt for this, so it waits until there is something worth keeping (see addItem).
 let persisted = null;
-navigator.storage?.persist?.().then((ok) => { persisted = ok; }, () => {});
+let askedToPersist = false;
+function askToPersist() {
+  if (askedToPersist) return;
+  askedToPersist = true;
+  navigator.storage?.persist?.().then((ok) => { persisted = ok; }, () => {});
+}
 
 function openSettings() {
   markTheme();
@@ -1907,12 +1914,42 @@ function readBackup(text) {
   if (data?.app !== 'find-notes' || !Array.isArray(data.lists) || !Array.isArray(data.items)) {
     throw new Error("that isn't a Find Notes backup");
   }
-  const listIds = new Set(data.lists.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string').map((l) => l.id));
-  const lists = data.lists.filter((l) => l && listIds.has(l.id));
+  // A file can be old, hand-edited or made to cause trouble, and whatever is imported is saved
+  // for good. So copy across only the fields the app knows, each as the type it expects.
+  const lists = data.lists.filter((l) => isId(l?.id) && typeof l.name === 'string').map(cleanList);
   // Items need a list to live in, either in the file or already here.
-  const known = new Set([...listIds, ...state.lists.map((l) => l.id), ...state.archive.lists.map((l) => l.id)]);
-  const items = data.items.filter((i) => i && typeof i.id === 'string' && typeof i.title === 'string' && known.has(i.listId));
+  const known = new Set([...lists, ...state.lists, ...state.archive.lists].map((l) => l.id));
+  const items = data.items
+    .filter((i) => isId(i?.id) && typeof i.title === 'string' && known.has(i.listId))
+    .map(cleanItem);
   return { lists, items, skipped: data.items.length - items.length };
+}
+
+const isId = (id) => typeof id === 'string' && id.length > 0 && id.length <= 100;
+const num = (n, fallback) => (Number.isFinite(n) ? n : fallback);
+
+function cleanList(l, index) {
+  const list = { id: l.id, name: l.name.slice(0, 40) || 'Untitled', icon: iconOf(l), order: num(l.order, index) };
+  if (Number.isFinite(l.archivedAt)) list.archivedAt = l.archivedAt;
+  return list;
+}
+
+function cleanItem(i, index) {
+  const now = Date.now();
+  const item = {
+    id: i.id,
+    listId: i.listId,
+    title: i.title.slice(0, 500) || 'Untitled',
+    body: typeof i.body === 'string' ? i.body.slice(0, 200000) : '',
+    done: !!i.done,
+    bookmarked: !!i.bookmarked,
+    order: num(i.order, index),
+    createdAt: num(i.createdAt, now),
+    updatedAt: num(i.updatedAt, now),
+  };
+  if (Number.isFinite(i.archivedAt)) item.archivedAt = i.archivedAt;
+  if (isId(i.archivedWith)) item.archivedWith = i.archivedWith;
+  return item;
 }
 
 el.importBtn.addEventListener('click', () => {
@@ -1923,9 +1960,15 @@ el.importBtn.addEventListener('click', () => {
       try {
         await db.batch({ put: [...lists.map((l) => ['lists', l]), ...items.map((i) => ['items', i])] });
         await load();
-        if (!state.lists.some((l) => l.id === state.currentId)) state.currentId = state.lists[0]?.id;
+        if (!state.lists.length) { // the file archived every list: there must always be one to show
+          const home = { id: db.uid(), name: 'Home', icon: 'flame', order: 0 };
+          state.lists.push(home);
+          save(db.put('lists', home));
+        }
+        if (!state.lists.some((l) => l.id === state.currentId)) state.currentId = state.lists[0].id;
         render();
-        say(`Restored ${lists.length} lists and ${items.length} items.` + (skipped ? ` ${skipped} items had no list and were skipped.` : ''));
+        say(`Restored ${lists.length} lists and ${items.length} items.`
+          + (skipped ? ` ${skipped} items had no list or couldn't be read, and were skipped.` : ''));
       } catch (err) {
         say(`Couldn't restore: ${err.message}`);
       }
