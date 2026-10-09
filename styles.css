@@ -1009,11 +1009,9 @@ h1, h2 {
   opacity: 1;
 }
 
-.dots-count {
-  height: 28px;
-  padding: 0 14px;
-  font-size: 13px;
-  color: var(--text-muted);
+.dot.edge::before {
+  width: 4px;
+  height: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {

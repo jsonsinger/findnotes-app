@@ -3,7 +3,7 @@
 // Change VERSION whenever you change any file of the app, and keep it the same as VERSION in
 // app.js. Browsers notice that sw.js changed, fetch the new files into a fresh cache, and the
 // app offers an "Update" button. Notes themselves are in IndexedDB and are never touched here.
-const VERSION = '0.1.3';
+const VERSION = '0.1.4';
 const CACHE = `find-notes-${VERSION}`;
 
 const SHELL = [

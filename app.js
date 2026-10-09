@@ -1247,7 +1247,7 @@ el.archiveBody.addEventListener('click', (e) => {
 
 /* ---------- the dots ---------- */
 
-const MAX_DOTS = 9; // past this, one dot per list gets too wide, so show "3 / 12"
+const MAX_DOTS = 5; // more lists than this: a window of five dots that follows you along
 
 const currentIndex = () => state.lists.findIndex((l) => l.id === state.currentId);
 
@@ -1256,18 +1256,14 @@ function renderDots() {
   el.dots.hidden = n < 2; // one list needs no indicator
   if (n < 2) return;
 
-  if (n > MAX_DOTS) {
-    const count = document.createElement('button');
-    count.className = 'dots-count';
-    count.textContent = `${currentIndex() + 1} / ${n}`;
-    count.setAttribute('aria-label', `List ${currentIndex() + 1} of ${n}. Open all lists`);
-    el.dots.replaceChildren(count);
-    return;
-  }
-
-  el.dots.replaceChildren(...state.lists.map((list) => {
+  // Like the page dots on a phone home screen: five at a time, with the end dots shrunk
+  // when there are more lists beyond them.
+  const start = clamp(currentIndex() - Math.floor(MAX_DOTS / 2), 0, Math.max(0, n - MAX_DOTS));
+  const shown = state.lists.slice(start, start + MAX_DOTS);
+  el.dots.replaceChildren(...shown.map((list, i) => {
     const dot = document.createElement('button');
     dot.className = 'dot';
+    if ((i === 0 && start > 0) || (i === shown.length - 1 && start + MAX_DOTS < n)) dot.classList.add('edge');
     dot.dataset.id = list.id;
     dot.setAttribute('aria-label', list.name); // list.name is user text, so no innerHTML
     if (list.id === state.currentId) dot.setAttribute('aria-current', 'true');
@@ -1279,10 +1275,6 @@ el.dots.addEventListener('click', (e) => {
   const button = e.target.closest('button');
   if (!button) return;
 
-  if (button.classList.contains('dots-count')) {
-    openAll();
-    return;
-  }
   const target = state.lists.find((l) => l.id === button.dataset.id);
   if (target && target.id !== state.currentId) {
     slideTo(target, state.lists.indexOf(target) > currentIndex() ? 1 : -1);
@@ -1805,7 +1797,7 @@ el.searchBody.addEventListener('click', (e) => {
 
 /* ---------- Settings: theme, backup and about ---------- */
 
-const VERSION = '0.1.3';
+const VERSION = '0.1.4';
 const THEME_KEY = 'find-notes:theme';
 
 function applyTheme(theme) {
