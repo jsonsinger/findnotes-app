@@ -25,6 +25,10 @@ const el = {
   tileIcon: $('tile-icon'),
   title: $('title'),
   titleInput: $('title-input'),
+  listEdit: $('listedit'),
+  editScrim: $('edit-scrim'),
+  iconGrid: $('icon-grid'),
+  editSlide: $('edit-slide'),
   stage: $('stage'),
   list: $('list'),
   add: $('add'),
@@ -53,6 +57,8 @@ const el = {
   archive: $('archive'),
   archiveBody: $('archive-body'),
   archiveBack: $('archive-back'),
+  settings: $('settings'),
+  settingsBack: $('settings-back'),
   trashIcon: $('trash-icon'),
   dots: $('dots'),
   header: $('header'),
@@ -626,7 +632,9 @@ el.itemTitle.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!el.menu.hidden) closeMenu();
+  else if (!el.listEdit.hidden) finishRename(false);
   else if (selection.size && el.archive.hidden && el.allLists.hidden && !drawer) clearSelection();
+  else if (!el.settings.hidden) closeSettings();
   else if (!el.archive.hidden) closeArchive();
   else if (!el.allLists.hidden) closeAll();
   else dismissDrawer();
@@ -920,7 +928,6 @@ function restoreItem(item, toListId = item.listId) {
 
 function openMenu() {
   // You can't archive your only list, so say so by greying it out.
-  el.menu.querySelector('[data-action="archive-list"]').disabled = state.lists.length < 2;
   lockBackground();
   el.menu.hidden = false;
   el.menuScrim.hidden = false;
@@ -943,7 +950,7 @@ el.menu.addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
   closeMenu();
-  ({ all: openAll, new: newList, rename: startRename, 'archive-list': archiveList, archive: openArchive })[action]();
+  ({ all: openAll, new: newList, edit: startRename, archive: openArchive, settings: openSettings })[action]();
 });
 
 /* ---------- the All lists screen ---------- */
@@ -1005,20 +1012,42 @@ function newList() {
   startRename(); // a new list almost always needs a name
 }
 
-// While renaming, the title is swapped for an input of the same size.
+// Tapping the list name opens a small panel: name, icon, and archiving the list.
 let renaming = false;
 
+function buildIconGrid() {
+  el.iconGrid.replaceChildren(...LIST_ICONS.map((name) => {
+    const b = document.createElement('button');
+    b.dataset.icon = name;
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-label', name);
+    b.innerHTML = '<svg class="icon" aria-hidden="true"><use href=""/></svg>';
+    b.querySelector('use').setAttribute('href', `#i-${name}`);
+    return b;
+  }));
+}
+
+function markIcon() {
+  const current = iconOf(currentList());
+  for (const b of el.iconGrid.children) b.setAttribute('aria-checked', String(b.dataset.icon === current));
+}
+
 function startRename() {
+  if (renaming) return;
   renaming = true;
+  if (!el.iconGrid.children.length) buildIconGrid();
+  markIcon();
+  el.editSlide.classList.toggle('locked', state.lists.length < 2); // you can't archive your only list
+  lockBackground();
+  el.listEdit.hidden = false;
+  el.editScrim.hidden = false;
   el.titleInput.value = currentList().name;
-  el.title.hidden = true;
-  el.titleInput.hidden = false;
   el.titleInput.focus();
   el.titleInput.select();
 }
 
 function finishRename(keep) {
-  if (!renaming) return; // Enter and the blur it causes both land here
+  if (!renaming) return;
   renaming = false;
 
   const list = currentList();
@@ -1027,16 +1056,32 @@ function finishRename(keep) {
     list.name = name;
     save(db.put('lists', list));
   }
-  el.titleInput.hidden = true;
-  el.title.hidden = false;
+  el.listEdit.hidden = true;
+  el.editScrim.hidden = true;
+  el.titleInput.blur();
+  unlockBackground();
+  restoreFocus();
   render();
 }
 
+el.who.addEventListener('click', () => { if (!animating) startRename(); });
+el.editScrim.addEventListener('click', () => finishRename(true));
 el.titleInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') finishRename(true);
-  if (e.key === 'Escape') finishRename(false);
+  if (e.key !== 'Enter') return;
+  e.preventDefault(); // otherwise the Enter lands on the name button we hand focus back to
+  finishRename(true);
 });
-el.titleInput.addEventListener('blur', () => finishRename(true));
+
+// An icon applies straight away, so you see it in the header behind the panel.
+el.iconGrid.addEventListener('click', (e) => {
+  const icon = e.target.closest('button')?.dataset.icon;
+  if (!icon) return;
+  const list = currentList();
+  list.icon = icon;
+  save(db.put('lists', list));
+  el.tileIcon.setAttribute('href', iconHref(list));
+  markIcon();
+});
 
 function archiveList() {
   if (state.lists.length < 2) {
@@ -1531,72 +1576,227 @@ el.selX.addEventListener('click', clearSelection);
 
 const selectedItems = () => state.items.filter((i) => selection.has(i.id));
 
-// The slide: drag the knob across, past 85% of the way, to archive.
+// The slide: drag the knob across, past 85% of the way, to confirm. Used for archiving
+// selected items and for archiving a whole list, so neither happens by accident.
 const COMMIT_AT = 0.85;
-let slide = null; // { id, x, max, dragging }
 
-const slideMax = () => el.selbar.clientWidth - 12 - 44; // knob shrinks to 44px wide while dragging
+function makeSlider(bar, onCommit) {
+  const knob = bar.querySelector('.sel-knob');
+  const fill = bar.querySelector('.sel-fill');
+  const inset = knob.offsetLeft || 6;
+  let slide = null; // { id, x, dragging, dx }
 
-el.selKnob.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse' && e.button !== 0) return;
-  slide = { id: e.pointerId, x: e.clientX, dragging: false, dx: 0 };
-  el.selKnob.setPointerCapture(e.pointerId);
-  el.selbar.classList.remove('settling', 'nudge');
-});
+  const max = () => bar.clientWidth - inset * 2 - 44; // the knob shrinks to 44px while dragging
 
-el.selKnob.addEventListener('pointermove', (e) => {
-  if (!slide || e.pointerId !== slide.id) return;
-  const dx = e.clientX - slide.x;
-  if (!slide.dragging) {
-    if (Math.abs(dx) < 4) return;
-    slide.dragging = true;
-    el.selbar.classList.add('dragging');
+  function reset(animate) {
+    if (animate) bar.classList.add('settling');
+    knob.style.left = '';
+    fill.style.width = '';
+    bar.classList.remove('dragging');
+    if (!animate) bar.classList.remove('settling');
+    else setTimeout(() => bar.classList.remove('settling'), 250);
   }
-  slide.dx = clamp(dx, 0, slideMax());
-  el.selKnob.style.left = `${6 + slide.dx}px`;
-  el.selFill.style.width = `${6 + slide.dx + 44 + 6}px`;
+
+  knob.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    slide = { id: e.pointerId, x: e.clientX, dragging: false, dx: 0 };
+    knob.setPointerCapture(e.pointerId);
+    bar.classList.remove('settling', 'nudge');
+  });
+
+  knob.addEventListener('pointermove', (e) => {
+    if (!slide || e.pointerId !== slide.id) return;
+    const dx = e.clientX - slide.x;
+    if (!slide.dragging) {
+      if (Math.abs(dx) < 4) return;
+      slide.dragging = true;
+      bar.classList.add('dragging');
+    }
+    slide.dx = clamp(dx, 0, max());
+    knob.style.left = `${inset + slide.dx}px`;
+    fill.style.width = `${inset + slide.dx + 44 + inset}px`;
+  });
+
+  function end(e) {
+    if (!slide || e.pointerId !== slide.id) return;
+    const { dragging, dx } = slide;
+    slide = null;
+    if (!dragging) {
+      // A tap isn't enough. Show which way to go. (Keyboard users get the click handler below.)
+      if (e.type === 'pointerup') {
+        bar.classList.remove('nudge');
+        void bar.offsetWidth;
+        bar.classList.add('nudge');
+      }
+      return;
+    }
+    if (e.type === 'pointerup' && dx >= max() * COMMIT_AT) {
+      navigator.vibrate?.(20);
+      onCommit();
+      reset(false);
+    } else {
+      reset(true);
+    }
+  }
+  knob.addEventListener('pointerup', end);
+  knob.addEventListener('pointercancel', end);
+
+  // Keyboard or screen reader: Enter/Space on the knob confirms directly (a touch tap has detail 1).
+  knob.addEventListener('click', (e) => {
+    if (e.detail === 0) onCommit();
+  });
+}
+
+makeSlider(el.selbar, () => archiveItems(selectedItems()));
+makeSlider(el.editSlide, () => {
+  finishRename(true);
+  archiveList();
 });
 
-function endSlide(e) {
-  if (!slide || e.pointerId !== slide.id) return;
-  const { dragging, dx } = slide;
-  slide = null;
-  if (!dragging) {
-    // A tap isn't enough. Show which way to go. (Keyboard users get the click handler below.)
-    if (e.type === 'pointerup') {
-      el.selbar.classList.remove('nudge');
-      void el.selbar.offsetWidth;
-      el.selbar.classList.add('nudge');
+/* ---------- Settings: theme, backup and about ---------- */
+
+const VERSION = '0.1.0';
+const THEME_KEY = 'find-notes:theme';
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', theme === 'light' ? '#f4f3ee' : '#171716');
+}
+
+function savedTheme() {
+  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+}
+
+applyTheme(savedTheme());
+
+function markTheme() {
+  const theme = savedTheme();
+  for (const b of $('theme-seg').children) b.setAttribute('aria-checked', String(b.dataset.themeChoice === theme));
+}
+
+$('theme-seg').addEventListener('click', (e) => {
+  const choice = e.target.closest('button')?.dataset.themeChoice;
+  if (!choice) return;
+  try { localStorage.setItem(THEME_KEY, choice); } catch { /* storage blocked: applies for this visit only */ }
+  applyTheme(choice);
+  markTheme();
+});
+
+// Ask the browser not to clear our storage when the device is short of space.
+let persisted = null;
+navigator.storage?.persist?.().then((ok) => { persisted = ok; }, () => {});
+
+function openSettings() {
+  markTheme();
+  $('version').textContent = VERSION;
+  $('backup-status').textContent = '';
+  const ask = navigator.storage?.persisted?.();
+  (ask ?? Promise.resolve(persisted)).then((ok) => {
+    $('persist-status').textContent = ok ? 'Protected' : 'Can be cleared by the browser';
+  }, () => { $('persist-status').textContent = 'Unknown'; });
+  lockBackground();
+  el.settings.hidden = false;
+  el.settingsBack.focus();
+}
+
+function closeSettings() {
+  disarmImport();
+  el.settings.hidden = true;
+  unlockBackground();
+  restoreFocus();
+}
+el.settingsBack.addEventListener('click', closeSettings);
+
+const say = (text) => { $('backup-status').textContent = text; };
+
+// A backup is one JSON file with everything, archived items included.
+$('export-btn').addEventListener('click', async () => {
+  try {
+    const [lists, items] = [await db.getAll('lists'), await db.getAll('items')];
+    const backup = { app: 'find-notes', format: 1, exportedAt: new Date().toISOString(), lists, items };
+    const name = `find-notes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([JSON.stringify(backup, null, 2)], name, { type: 'application/json' });
+
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); say(`Backup ready: ${lists.length} lists, ${items.length} items.`); return; }
+      catch (err) { if (err.name === 'AbortError') return; /* otherwise fall through to a plain download */ }
     }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    say(`Saved ${name}: ${lists.length} lists, ${items.length} items.`);
+  } catch (err) {
+    say(`Couldn't make a backup: ${err.message}`);
+  }
+});
+
+// Restoring only adds and updates. Nothing already on the device is deleted, so a
+// wrong file can't wipe your notes. Records are matched by id.
+let pendingImport = null;
+let importTimer = 0;
+
+function disarmImport() {
+  clearTimeout(importTimer);
+  pendingImport = null;
+  const b = $('import-btn');
+  b.classList.remove('sure');
+  b.textContent = 'Restore from a backup';
+}
+
+function readBackup(text) {
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error("that isn't a Find Notes backup"); }
+  if (data?.app !== 'find-notes' || !Array.isArray(data.lists) || !Array.isArray(data.items)) {
+    throw new Error("that isn't a Find Notes backup");
+  }
+  const listIds = new Set(data.lists.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string').map((l) => l.id));
+  const lists = data.lists.filter((l) => l && listIds.has(l.id));
+  // Items need a list to live in, either in the file or already here.
+  const known = new Set([...listIds, ...state.lists.map((l) => l.id), ...state.archive.lists.map((l) => l.id)]);
+  const items = data.items.filter((i) => i && typeof i.id === 'string' && typeof i.title === 'string' && known.has(i.listId));
+  return { lists, items, skipped: data.items.length - items.length };
+}
+
+$('import-btn').addEventListener('click', () => {
+  if (pendingImport) { // second tap: do it
+    const { lists, items, skipped } = pendingImport;
+    disarmImport();
+    (async () => {
+      try {
+        await db.batch({ put: [...lists.map((l) => ['lists', l]), ...items.map((i) => ['items', i])] });
+        await load();
+        if (!state.lists.some((l) => l.id === state.currentId)) state.currentId = state.lists[0]?.id;
+        render();
+        say(`Restored ${lists.length} lists and ${items.length} items.` + (skipped ? ` ${skipped} items had no list and were skipped.` : ''));
+      } catch (err) {
+        say(`Couldn't restore: ${err.message}`);
+      }
+    })();
     return;
   }
-  const commit = e.type === 'pointerup' && dx >= slideMax() * COMMIT_AT;
-  if (commit) {
-    navigator.vibrate?.(20);
-    archiveItems(selectedItems());
-    resetSlide(false);
-  } else {
-    resetSlide(true);
-  }
-}
-
-function resetSlide(animate) {
-  const bar = el.selbar;
-  if (animate) bar.classList.add('settling');
-  el.selKnob.style.left = '';
-  el.selFill.style.width = '';
-  bar.classList.remove('dragging');
-  if (!animate) bar.classList.remove('settling');
-  else setTimeout(() => bar.classList.remove('settling'), 250);
-}
-el.selKnob.addEventListener('pointerup', endSlide);
-el.selKnob.addEventListener('pointercancel', endSlide);
-
-// Keyboard or screen reader: Enter/Space on the knob archives directly (a touch tap has detail 1).
-el.selKnob.addEventListener('click', (e) => {
-  if (e.detail === 0) archiveItems(selectedItems());
+  $('import-file').click();
 });
 
+$('import-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    pendingImport = readBackup(await file.text());
+    const b = $('import-btn');
+    b.classList.add('sure');
+    b.textContent = `Restore ${pendingImport.lists.length} lists, ${pendingImport.items.length} items?`;
+    say('Tap again to add them to what is here. Nothing is deleted.');
+    clearTimeout(importTimer);
+    importTimer = setTimeout(() => { disarmImport(); say(''); }, 8000);
+  } catch (err) {
+    disarmImport();
+    say(`Couldn't restore: ${err.message}.`);
+  }
+});
 
 /* ---------- temporary: ?debug shows what the phone reports (remove when swiping is sorted) ---------- */
 

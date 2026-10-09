@@ -6,6 +6,7 @@
   <title>Find Notes</title>
   <meta name="description" content="Lists that can grow into notes.">
   <meta name="color-scheme" content="dark">
+  <script>try{if(localStorage.getItem("find-notes:theme")==="light")document.documentElement.dataset.theme="light"}catch{}</script>
   <meta name="theme-color" content="#171716">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -90,12 +91,11 @@
   <div id="app">
     <header class="header" id="header">
       <div class="whos" id="whos">
-        <span class="who" id="who">
+        <button class="who" id="who" aria-label="Edit list name and icon" aria-haspopup="dialog">
           <span class="tile">
             <svg class="icon" aria-hidden="true"><use id="tile-icon" href="#i-list"/></svg>
           </span>
           <h1 id="title">Find Notes</h1>
-          <input class="title-input" id="title-input" type="text" maxlength="40" aria-label="List name" autocomplete="off" enterkeyhint="done" hidden>
         </span>
       </div>
       <button class="icon-btn" aria-label="Search">
@@ -161,9 +161,24 @@
    <div class="menu" id="menu" hidden>
      <button data-action="all">All lists</button>
      <button data-action="new">New list</button>
-     <button data-action="rename">Rename list</button>
-     <button data-action="archive-list">Archive list</button>
-     <button data-action="archive">View archive</button>
+     <button data-action="edit">Edit list</button>
+     <hr>
+     <button data-action="archive">Archive</button>
+     <button data-action="settings">Settings</button>
+   </div>
+
+   <div class="menu-scrim" id="edit-scrim" hidden></div>
+   <div class="listedit" id="listedit" role="dialog" aria-label="Edit list" hidden>
+     <input class="title-input" id="title-input" type="text" maxlength="40" aria-label="List name" autocomplete="off" enterkeyhint="done">
+     <div class="icon-grid" id="icon-grid" role="radiogroup" aria-label="List icon"></div>
+     <div class="selbar inline" id="edit-slide">
+       <div class="sel-fill"></div>
+       <span class="sel-hint">Slide to archive</span>
+       <button class="sel-knob" aria-label="Archive this list">
+         <svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg>
+         <span class="sel-label">Archive</span>
+       </button>
+     </div>
    </div>
 
    <section class="screen" id="all-lists" role="dialog" aria-modal="true" aria-label="All lists" hidden>
@@ -186,6 +201,33 @@
        <h2>Archive</h2>
      </header>
      <div class="screen-body" id="archive-body"></div>
+   </section>
+   <section class="screen" id="settings" role="dialog" aria-modal="true" aria-label="Settings" hidden>
+     <header class="header">
+       <button class="icon-btn" id="settings-back" aria-label="Back">
+         <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
+       </button>
+       <h2>Settings</h2>
+     </header>
+     <div class="screen-body">
+       <h3 class="arch-heading">Appearance</h3>
+       <div class="setting">
+         <span>Theme</span>
+         <div class="seg" id="theme-seg" role="radiogroup" aria-label="Theme">
+           <button role="radio" data-theme-choice="dark">Dark</button>
+           <button role="radio" data-theme-choice="light">Light</button>
+         </div>
+       </div>
+       <h3 class="arch-heading">Backup</h3>
+       <p class="setting-note">Your notes live only on this device. A backup is a file you can keep somewhere safe and bring back later.</p>
+       <div class="setting"><button class="setting-btn" id="export-btn">Export a backup</button></div>
+       <div class="setting"><button class="setting-btn" id="import-btn">Restore from a backup</button></div>
+       <input type="file" id="import-file" accept="application/json,.json" hidden>
+       <p class="setting-note" id="backup-status" role="status"></p>
+       <h3 class="arch-heading">About</h3>
+       <div class="setting"><span>Version</span><span class="setting-value" id="version"></span></div>
+       <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
+     </div>
    </section>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
