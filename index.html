@@ -9,6 +9,12 @@
   <script>try{if(localStorage.getItem("find-notes:theme")==="light")document.documentElement.dataset.theme="light"}catch{}</script>
   <meta name="theme-color" content="#171716">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Find Notes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -130,6 +136,18 @@
     </div>
 
 
+    <div class="selbar" id="listbar" hidden>
+        <div class="sel-fill"></div>
+        <span class="sel-hint" id="listbar-hint"></span>
+        <button class="sel-knob" aria-label="Archive this list">
+            <svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg>
+            <span class="sel-label">Archive</span>
+        </button>
+        <button class="sel-x" id="listbar-x" aria-label="Cancel">
+            <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+        </button>
+    </div>
+
     <button class="addbar" id="add">
         <span>Add an item</span>
         <span class="addbar-plus" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span>
@@ -172,6 +190,7 @@
      <button data-action="new">New list</button>
      <button data-action="edit">Edit list</button>
      <hr>
+     <button data-action="archive-this" id="menu-archive-this">Archive this list</button>
      <button data-action="archive">Archive</button>
      <button data-action="settings">Settings</button>
    </div>
@@ -180,14 +199,6 @@
    <div class="listedit" id="listedit" role="dialog" aria-label="Edit list" hidden>
      <input class="title-input" id="title-input" type="text" maxlength="40" aria-label="List name" autocomplete="off" enterkeyhint="done">
      <div class="icon-grid" id="icon-grid" role="radiogroup" aria-label="List icon"></div>
-     <div class="selbar inline" id="edit-slide">
-       <div class="sel-fill"></div>
-       <span class="sel-hint">Slide to archive</span>
-       <button class="sel-knob" aria-label="Archive this list">
-         <svg class="icon" aria-hidden="true"><use href="#i-archive"/></svg>
-         <span class="sel-label">Archive</span>
-       </button>
-     </div>
    </div>
 
    <section class="screen" id="all-lists" role="dialog" aria-modal="true" aria-label="All lists" hidden>

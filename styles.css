@@ -785,17 +785,6 @@ h1, h2 {
   display: flex;
 }
 
-/* Hidden twin of the description, used to count how many lines the text takes */
-.measure {
-  position: absolute;
-  visibility: hidden;
-  pointer-events: none;
-  font-size: 16px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-}
-
 /* Toast: a short message with an optional Undo */
 .toast {
   z-index: 9; /* above the full-screen pages, so Undo is never hidden */
@@ -894,25 +883,6 @@ h1, h2 {
 .icon-grid .icon {
   width: 22px;
   height: 22px;
-}
-
-/* The same slide-to-archive control, inside the panel */
-.selbar.inline {
-  position: relative;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  margin: 4px 0 8px;
-  background: var(--tile-bg); /* the panel is the same colour as the bar, so lift it a little */
-}
-
-.selbar.inline .sel-hint {
-  right: 20px; /* no cross button here */
-}
-
-.selbar.locked {
-  opacity: 0.4;
-  pointer-events: none;
 }
 
 /* Three-dots menu */
@@ -1237,4 +1207,14 @@ h1, h2 {
   text-align: center;
   color: var(--text-muted);
   font-size: 15px;
+}
+
+/* "Archive this list": the list dims, and fades further as you slide */
+#list.archiving {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+#list.archiving[style*="opacity"] {
+  transition: none;
 }

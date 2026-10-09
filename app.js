@@ -1,22 +1,6 @@
 import * as db from './db.js';
 import { createEditor, plainText } from './editor.js';
 
-window.db = db; // temporary, for experimenting in the console
-
-// Temporary: show errors on screen, so a phone without a console can still tell us what broke.
-// A bare "Script error." usually means the phone mixed old and new files after an update.
-function showCrash(message) {
-  console.error(message);
-  const opaque = !message || /^script error/i.test(message);
-  showBanner(
-    opaque ? 'Find Notes has been updated. Reload to get the latest version.' : `Something went wrong: ${message}`,
-    'Reload',
-    () => location.reload(),
-  );
-}
-addEventListener('error', (e) => showCrash(e.message));
-addEventListener('unhandledrejection', (e) => showCrash(e.reason?.message ?? String(e.reason)));
-
 const $ = (id) => document.getElementById(id);
 const el = {
   app: $('app'),
@@ -29,7 +13,10 @@ const el = {
   listEdit: $('listedit'),
   editScrim: $('edit-scrim'),
   iconGrid: $('icon-grid'),
-  editSlide: $('edit-slide'),
+  listbar: $('listbar'),
+  listbarHint: $('listbar-hint'),
+  listbarX: $('listbar-x'),
+  menuArchiveThis: $('menu-archive-this'),
   stage: $('stage'),
   list: $('list'),
   add: $('add'),
@@ -154,7 +141,8 @@ function recallList() {
 }
 
 function switchTo(id) {
-  hideToast(); // an Undo for something on the list you just left would make no sense
+  hideToast();
+  closeListBar(); // an Undo for something on the list you just left would make no sense
   clearSelection();
   state.currentId = id;
   rememberList(id);
@@ -387,7 +375,6 @@ const AUTOSAVE_MAX_MS = 60000;  // ...or a minute after the first unsaved change
 const cancelSave = () => { clearTimeout(saveTimer); clearTimeout(maxTimer); saveTimer = maxTimer = null; };
 
 let hintError = '';
-let story = false;     // derived from the text, never stored
 let expanded = false;  // is the sheet more than half way up?
 
 function setHint(message, isError = false) {
@@ -396,11 +383,10 @@ function setHint(message, isError = false) {
   refreshHint();
 }
 
-// An error wins; otherwise a long note at the small size is told how to keep writing.
+// An error wins; otherwise it says when the note was last saved.
 function refreshHint() {
-  const swipeHint = drawer && story && !expanded ? 'Swipe up to keep writing' : '';
   const saved = hintError ? '' : savedText();
-  el.hintText.textContent = hintError || saved || swipeHint;
+  el.hintText.textContent = hintError || saved;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
 }
 
@@ -422,12 +408,6 @@ function savedText() {
 }
 setInterval(() => { if (drawer?.savedAt) refreshHint(); }, 15000);
 
-// A hidden copy of the description tells us how many lines the text really takes.
-const measure = document.createElement('div');
-measure.className = 'measure';
-measure.setAttribute('aria-hidden', 'true');
-el.drawer.append(measure);
-
 // The description is a small rich-text editor that saves plain Markdown (see editor.js).
 const editor = createEditor(el.itemBody, {
   onChange: () => { updateKind(); updateTrash(); scheduleSave(); },
@@ -435,16 +415,7 @@ const editor = createEditor(el.itemBody, {
 });
 const getBody = () => editor.getMarkdown();
 
-const PEEK_LINES = 3;
-function linesOf(text) {
-  measure.style.width = el.itemBody.clientWidth + 'px';
-  measure.textContent = text.endsWith('\n') ? text + ' ' : text || ' ';
-  return Math.round(measure.scrollHeight / 24);
-}
-
-// Whether the description has outgrown the small sheet. (Stories will build on this later.)
 function updateKind() {
-  story = linesOf(plainText(getBody())) > PEEK_LINES;
   syncMeta();
   refreshHint();
 }
@@ -655,18 +626,21 @@ el.itemTitle.addEventListener('keydown', (e) => {
   }
 });
 
-// Escape closes whatever is on top: the menu, then All lists, then the drawer
-// (which discards, like swiping it down).
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
+// Whatever is on top closes first: the menu or list panel, a full-screen page, a selection, then
+// the note. Escape on a keyboard and the Back button on Android both come here.
+function closeTop() {
   if (!el.menu.hidden) closeMenu();
   else if (!el.listEdit.hidden) finishRename(false);
-  else if (selection.size && el.archive.hidden && el.allLists.hidden && !drawer) clearSelection();
   else if (!el.search.hidden) closeSearch();
   else if (!el.settings.hidden) closeSettings();
   else if (!el.archive.hidden) closeArchive();
   else if (!el.allLists.hidden) closeAll();
-  else dismissDrawer();
+  else if (!el.listbar.hidden) closeListBar();
+  else if (selection.size) clearSelection();
+  else dismissDrawer(); // discards edits, like swiping down
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeTop();
 });
 
 // A phone can kill the page the moment you switch apps, so save straight away.
@@ -957,6 +931,7 @@ function restoreItem(item, toListId = item.listId) {
 
 function openMenu() {
   // You can't archive your only list, so say so by greying it out.
+  el.menuArchiveThis.disabled = state.lists.length < 2;
   lockBackground();
   el.menu.hidden = false;
   el.menuScrim.hidden = false;
@@ -979,7 +954,7 @@ el.menu.addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
   closeMenu();
-  ({ all: openAll, new: newList, edit: startRename, archive: openArchive, settings: openSettings })[action]();
+  ({ all: openAll, new: newList, edit: startRename, 'archive-this': openListBar, archive: openArchive, settings: openSettings })[action]();
 });
 
 /* ---------- the All lists screen ---------- */
@@ -1041,7 +1016,7 @@ function newList() {
   startRename(); // a new list almost always needs a name
 }
 
-// Tapping the list name opens a small panel: name, icon, and archiving the list.
+// Tapping the list name opens a small panel: name and icon.
 let renaming = false;
 
 function buildIconGrid() {
@@ -1066,7 +1041,6 @@ function startRename() {
   renaming = true;
   if (!el.iconGrid.children.length) buildIconGrid();
   markIcon();
-  el.editSlide.classList.toggle('locked', state.lists.length < 2); // you can't archive your only list
   lockBackground();
   el.listEdit.hidden = false;
   el.editScrim.hidden = false;
@@ -1552,8 +1526,9 @@ function cancelHold() {
 
 function updateSelBar() {
   const n = selection.size;
+  if (n) closeListBar(); // one bar at a time
   el.selbar.hidden = !n;
-  el.app.classList.toggle('selecting', n > 0);
+  el.app.classList.toggle('selecting', n > 0 || !el.listbar.hidden);
   el.selHint.textContent = `${n} selected`;
   el.selKnob.setAttribute('aria-label', n === 1 ? 'Archive 1 selected item' : `Archive ${n} selected items`);
 }
@@ -1609,7 +1584,7 @@ const selectedItems = () => state.items.filter((i) => selection.has(i.id));
 // selected items and for archiving a whole list, so neither happens by accident.
 const COMMIT_AT = 0.85;
 
-function makeSlider(bar, onCommit) {
+function makeSlider(bar, onCommit, onProgress = () => {}) {
   const knob = bar.querySelector('.sel-knob');
   const fill = bar.querySelector('.sel-fill');
   const inset = knob.offsetLeft || 6;
@@ -1621,6 +1596,7 @@ function makeSlider(bar, onCommit) {
     if (animate) bar.classList.add('settling');
     knob.style.left = '';
     fill.style.width = '';
+    onProgress(0);
     bar.classList.remove('dragging');
     if (!animate) bar.classList.remove('settling');
     else setTimeout(() => bar.classList.remove('settling'), 250);
@@ -1644,6 +1620,7 @@ function makeSlider(bar, onCommit) {
     slide.dx = clamp(dx, 0, max());
     knob.style.left = `${inset + slide.dx}px`;
     fill.style.width = `${inset + slide.dx + 44 + inset}px`;
+    onProgress(slide.dx / max());
   });
 
   function end(e) {
@@ -1676,10 +1653,36 @@ function makeSlider(bar, onCommit) {
   });
 }
 
-makeSlider(el.selbar, () => archiveItems(selectedItems()));
-makeSlider(el.editSlide, () => {
-  finishRename(true);
+makeSlider(el.selbar, () => archiveItems(selectedItems()), (p) => {
+  // Only the picked rows fade as you slide; the rest of the list stays put.
+  el.list.querySelectorAll('.row.selected').forEach((r) => { r.style.opacity = p ? String(1 - 0.85 * p) : ''; });
+});
+
+// "Archive this list" in the menu brings up the same bar, for the whole list.
+function openListBar() {
+  if (state.lists.length < 2) { showToast('Keep at least one list'); return; }
+  clearSelection();
+  el.listbarHint.textContent = currentList().name;
+  el.listbar.hidden = false;
+  el.list.classList.add('archiving'); // the whole list is the target, so dim it
+  el.app.classList.add('selecting');
+}
+
+function closeListBar() {
+  if (el.listbar.hidden) return;
+  el.listbar.hidden = true;
+  el.list.classList.remove('archiving');
+  el.list.style.opacity = '';
+  el.app.classList.toggle('selecting', selection.size > 0);
+}
+
+el.listbarX.addEventListener('click', closeListBar);
+makeSlider(el.listbar, () => {
+  closeListBar();
   archiveList();
+}, (p) => {
+  // The further you slide, the more the list fades away.
+  if (!el.listbar.hidden) el.list.style.opacity = p ? String(0.5 - 0.4 * p) : '';
 });
 
 /* ---------- Search: every list at once ---------- */
@@ -1802,7 +1805,7 @@ el.searchBody.addEventListener('click', (e) => {
 
 /* ---------- Settings: theme, backup and about ---------- */
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.3';
 const THEME_KEY = 'find-notes:theme';
 
 function applyTheme(theme) {
@@ -1945,41 +1948,82 @@ $('import-file').addEventListener('change', async (e) => {
   }
 });
 
-/* ---------- temporary: ?debug shows what the phone reports (remove when swiping is sorted) ---------- */
+/* ---------- the Back button (Android) closes what is on top instead of leaving the app ---------- */
 
-if (new URLSearchParams(location.search).has('debug')) {
-  const hud = document.createElement('pre');
-  hud.style.cssText = 'position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:99;'
-    + 'margin:0;padding:6px 10px;font:11px/1.35 monospace;background:rgba(0,0,0,.82);color:#9f9;'
-    + 'pointer-events:none;white-space:pre-wrap';
-  document.body.append(hud);
-  const counts = {};
-  let last = '';
-  const show = () => {
-    const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
-    hud.textContent = [
-      Object.entries(counts).map(([k, v]) => `${k}:${v}`).join(' '),
-      `last: ${last}`,
-      `lists=${state.lists.length} animating=${animating} swipe=${swipe ? (swipe.locked ? 'locked' : 'armed') : 'none'} drawer=${drawer ? drawer.mode : 'null'}`,
-      `vv=${vv ? Math.round(vv.height) : '-'}/${innerHeight} top=${vv ? Math.round(vv.offsetTop) : '-'} app=${el.app.style.height || 'auto'} tf=${el.app.style.transform || 'none'} scrollY=${Math.round(scrollY)}`,
-      `sheet top=${Math.round(el.drawer.getBoundingClientRect().top)} bottom=${Math.round(el.drawer.getBoundingClientRect().bottom)} h=${Math.round(sheetH)}`,
-      `centre of screen hits: ${hit ? (hit.id ? '#' + hit.id : '') + '.' + String(hit.className).slice(0, 30) + ' <' + hit.tagName.toLowerCase() + '>' : 'nothing'}`,
-    ].join('\n');
-  };
-  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'touchstart', 'touchmove', 'touchend', 'click']) {
-    document.addEventListener(type, (e) => {
-      counts[type] = (counts[type] || 0) + 1;
-      if (type !== 'pointermove' && type !== 'touchmove') {
-        const x = e.clientX ?? e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX ?? 0;
-        last = `${type} ${e.pointerType || ''} x=${Math.round(x)} on ${e.target.id ? '#' + e.target.id : String(e.target.className).slice(0, 24) || e.target.tagName}`;
-      }
-      show();
-    }, true);
+const overlayOpen = () => !el.menu.hidden || !el.listEdit.hidden || !el.search.hidden || !el.settings.hidden
+  || !el.archive.hidden || !el.allLists.hidden || selection.size > 0 || !el.listbar.hidden || !!drawer;
+
+// One history entry stands in for "something is open". Back removes it and we close the top layer.
+let marker = false;
+let ignorePops = 0;
+let backTimer = 0;
+
+function syncHistory() {
+  if (overlayOpen()) {
+    clearTimeout(backTimer);
+    if (!marker) { history.pushState({ overlay: true }, ''); marker = true; }
+  } else if (marker) {
+    // Wait a beat: moving from one layer to another (menu, then Settings) shouldn't churn history.
+    clearTimeout(backTimer);
+    backTimer = setTimeout(() => {
+      if (marker && !overlayOpen()) { marker = false; ignorePops++; history.back(); }
+    }, 60);
   }
-  vv?.addEventListener('resize', show);
-  vv?.addEventListener('scroll', show);
-  setInterval(show, 150);
-  show();
+}
+
+addEventListener('popstate', () => {
+  if (ignorePops) { ignorePops--; return; }
+  if (!marker) return;
+  marker = false;
+  closeTop();
+  syncHistory(); // another layer still open? put the marker back
+});
+
+if (history.state?.overlay) history.replaceState(null, ''); // a reload left one behind
+
+const watchOverlays = new MutationObserver(syncHistory);
+for (const node of [el.menu, el.listEdit, el.search, el.settings, el.archive, el.allLists, el.drawer, el.app]) {
+  watchOverlays.observe(node, { attributes: true, attributeFilter: ['hidden', 'class'] });
+}
+
+/* ---------- working offline: a service worker keeps the app on the device ---------- */
+
+// Keep this in step with VERSION in sw.js. Changing sw.js is what tells phones there is an update.
+function setupOffline() {
+  if (!('serviceWorker' in navigator)) return;
+  const params = new URLSearchParams(location.search);
+
+  if (params.has('nosw')) { // ?nosw clears it out, handy while testing
+    navigator.serviceWorker.getRegistrations().then((all) => all.forEach((r) => r.unregister()));
+    caches?.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+    return;
+  }
+  // While building on your own computer or network the worker would keep serving old files.
+  const host = location.hostname;
+  const local = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')
+    || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+  if (local && !params.has('sw')) return;
+
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    const offer = () => showBanner('A new version of Find Notes is ready.', 'Update', () => reg.waiting?.postMessage('skip-waiting'));
+    if (reg.waiting && navigator.serviceWorker.controller) offer();
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      worker?.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) offer();
+      });
+    });
+    // Coming back to the app is a good moment to look for a new version.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }, (error) => console.error('Offline support unavailable', error));
+
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return; // the very first install needs no reload
+    reloading = true;
+    location.reload();
+  });
 }
 
 /* ---------- start ---------- */
@@ -2013,4 +2057,5 @@ async function init() {
   render();
 }
 
-init();
+init();
+setupOffline();
