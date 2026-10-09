@@ -1,42 +1,45 @@
+/* Dark is the only theme for now. The light values are kept below for later:
+   put data-theme="light" on <html> to try them. */
 :root {
+  --bg: #171716;
+  --surface: #262624;
+  --bar-bg: #272726;
+  --text: #f2f2f0;
+  --text-muted: #9a988f;
+  --accent: #c9a95e;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.24);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --danger: #ff7b6e;
+  --toast-bg: #363634;
+  --toast-text: #f2f2f0;
+  --toast-action: #d6b96c;
+  --on-accent: #1c1c1b;
+  --tile-bg: #2c2c2a;
+  --tile-text: #fff;
+  --warn-bg: #3a2321;
+  --warn-text: #ffb4aa;
+  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
   --bg: #fff;
   --surface: #f5f5f3;
+  --bar-bg: #efeeea;
   --text: #1f1f1e;
-  --text-muted: #77766f;
-  --accent: #1a6fd1;
+  --text-muted: #6a6962;
+  --accent: #96742a; /* gold, deepened so it reads on white */
   --line: rgba(0, 0, 0, 0.1);
   --line-strong: rgba(0, 0, 0, 0.22);
   --scrim: rgba(0, 0, 0, 0.35);
   --danger: #c0392b;
   --toast-bg: #2c2c2a;
-  --toast-text: #f2f2f0;
-  --toast-action: #8ab8f5;
   --on-accent: #fff;
-  --tile-bg: #2c2c2a;
-  --tile-text: #fff;
   --warn-bg: #fdecea;
   --warn-text: #7a1f16;
-  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
-  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
-    color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1c1b;
-    --surface: #2a2a28;
-    --text: #f2f2f0;
-    --text-muted: #9a988f;
-    --accent: #5aa2f0;
-    --line: rgba(255, 255, 255, 0.12);
-    --line-strong: rgba(255, 255, 255, 0.24);
-    --scrim: rgba(0, 0, 0, 0.55);
-    --danger: #ff7b6e;
-    --toast-bg: #363634;
-    --on-accent: #1c1c1b;
-    --warn-bg: #3a2321;
-    --warn-text: #ffb4aa;
-  }
+  color-scheme: light;
 }
 
 * {
@@ -50,7 +53,10 @@
   display: none !important;
 }
 
-html, body { overscroll-behavior: none; }
+html, body { overscroll-behavior: none; overflow: hidden; height: 100%; }
+
+#item-title, #item-body { scrollbar-width: none; }
+#item-title::-webkit-scrollbar, #item-body::-webkit-scrollbar { display: none; }
 
 body {
   background: var(--bg);
@@ -102,6 +108,29 @@ h1, h2 {
   text-overflow: ellipsis;
 }
 
+/* The icon and name of the current list. Neighbouring lists fade through it while you swipe. */
+.whos {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.who {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.who.ghost {
+  pointer-events: none;
+}
+
+.header h1 {
+  color: var(--text-muted);
+}
+
 .tile {
   width: 30px;
   height: 30px;
@@ -116,6 +145,17 @@ h1, h2 {
 .tile .icon {
   width: 18px;
   height: 18px;
+}
+
+.tile.small {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.tile.small .icon {
+  width: 22px;
+  height: 22px;
 }
 
 .icon-btn {
@@ -154,7 +194,7 @@ h1, h2 {
   overflow-y: auto;
   background: var(--bg);
   /* room to scroll the last item clear of the floating button */
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 110px);
 }
 
 /* A throwaway copy of a neighbouring list, only there during a swipe */
@@ -163,18 +203,170 @@ h1, h2 {
 }
 
 .empty {
+  min-height: 55%;
   padding: 20px;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
   color: var(--text-muted);
+}
+
+.empty strong {
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.empty span {
+  font-size: 14px;
+  opacity: 0.75;
 }
 
 /* One item in the list */
 .row {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 6px;
   padding: 6px 20px 6px 8px;
   border-top: 0.5px solid var(--line);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Long-press selects a row. A selected row has a gold circle and a lighter background. */
+.row.selected {
+  background: var(--surface);
+}
+
+.row.selected .circle {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.row.selected .circle .icon {
+  opacity: 1;
+}
+
+/* While rows are selected, this slide-to-archive bar replaces the add bar */
+#app.selecting #add {
+  display: none;
+}
+
+.selbar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  height: 56px;
+  border-radius: 28px;
+  background: var(--bar-bg);
+  overflow: hidden;
+  z-index: 3;
+  touch-action: none;
+}
+
+.sel-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: rgba(201, 169, 94, 0.22);
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.sel-hint {
+  position: absolute;
+  left: 132px;
+  right: 56px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.sel-hint::after {
+  content: '\203A\203A\203A';
+  letter-spacing: -1px;
+  opacity: 0.6;
+}
+
+.sel-knob {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px 0 11px;
+  border-radius: 22px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  font-weight: 600;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.sel-label {
+  max-width: 80px;
+  opacity: 1;
+  transition: max-width 0.15s, opacity 0.15s;
+}
+
+/* Being dragged, the knob shrinks to just the icon */
+.selbar.dragging .sel-knob {
+  gap: 0;
+  padding: 0 11px;
+}
+
+.selbar.dragging .sel-label {
+  max-width: 0;
+  opacity: 0;
+}
+
+.selbar.dragging .sel-hint,
+.selbar.dragging .sel-x {
+  opacity: 0;
+}
+
+.selbar.settling .sel-knob,
+.selbar.settling .sel-fill {
+  transition: left 0.2s ease, width 0.2s ease;
+}
+
+.selbar.nudge .sel-knob {
+  animation: nudge 0.35s ease;
+}
+
+@keyframes nudge {
+  40% { transform: translateX(14px); }
+}
+
+.sel-x {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  transition: opacity 0.15s;
 }
 
 .check {
@@ -237,50 +429,41 @@ h1, h2 {
   text-overflow: ellipsis;
 }
 
-/* .add-bar {
-  margin: 4px 14px calc(env(safe-area-inset-bottom, 0px) + 12px);
-  padding: 8px 8px 8px 16px;
-  background: var(--surface);
-  border-radius: 14px;
+/* The add bar: one tappable bar along the bottom, with the gold plus inside it */
+.addbar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  height: 56px;
+  padding: 0 6px 0 22px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  border-radius: 28px;
+  background: var(--bar-bg);
   color: var(--text-muted);
+  font-size: 17px;
+  z-index: 3; /* above the list, below the scrim and drawer */
 }
 
-.add-go {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  display: grid;
-  place-items: center;
-} */
-
-/* Floating add button, bottom right */
-.fab {
-  position: absolute;
-  right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  width: 56px;
-  height: 56px;
+.addbar-plus {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--on-accent);
   display: grid;
   place-items: center;
-  box-shadow: var(--shadow-float);
-  z-index: 3; /* above the list, below the scrim and drawer */
 }
 
-.fab .icon {
-  width: 26px;
-  height: 26px;
+.addbar-plus .icon {
+  width: 24px;
+  height: 24px;
   stroke-width: 2;
 }
 
-.fab:active {
+.addbar:active .addbar-plus {
   transform: scale(0.95);
 }
 
@@ -365,7 +548,7 @@ h1, h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   flex: none;
   touch-action: none; /* part of the drag zone */
 }
@@ -373,14 +556,7 @@ h1, h2 {
 .drawer-actions {
   display: flex;
   align-items: center;
-}
-
-.chip {
-  font-size: 12px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 0.5px solid var(--line-strong);
-  color: var(--text-muted);
+  margin-right: -8px; /* the glyphs line up with the screen's right margin */
 }
 
 #item-title,
@@ -398,7 +574,7 @@ h1, h2 {
 }
 
 #item-title {
-  flex: 1;
+  flex: none;
   min-width: 0;
   font-size: 22px;
   font-weight: 500;
@@ -418,54 +594,86 @@ h1, h2 {
   color: var(--text-muted);
 }
 
-/* The heading and the confirm button share a row, so the button is always in reach */
-.title-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex: none;
-}
-
 #hint {
   flex: 1;
   min-width: 0;
-  margin: 0 10px;
-  font-size: 12px;
+  margin: 0 10px 0 0;
+  font-size: 13px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.hint-icon {
+  width: 13px;
+  height: 13px;
+  vertical-align: -2px;
+  margin-right: 5px;
+  stroke-width: 2;
+}
+
 .drawer-top.error #hint {
   color: var(--danger);
 }
 
-/* The confirm button: the same round accent as the plus button it grew out of */
+/* The confirm glyph: a gold plus when adding, a white tick when saved, a gold tick while
+   changes are still waiting to be saved. */
 #done {
-  width: 40px;
-  height: 40px;
-  margin-top: -2px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--on-accent);
-  display: grid;
-  place-items: center;
-  flex: none;
+  color: var(--text);
+}
+
+#done[data-state='plus'],
+#done[data-state='pending'] {
+  color: var(--accent);
 }
 
 #done .icon {
-  width: 22px;
-  height: 22px;
   stroke-width: 2.2;
+}
+
+#bookmark[aria-pressed='true'] {
+  color: var(--text-muted);
+}
+
+#bookmark[aria-pressed='true'] .icon {
+  fill: currentColor;
+}
+
+/* Story header: the created date and an optional label, only at full height */
+.meta {
+  display: none;
+  flex: none;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: space-between;
+  margin: -8px 0 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.drawer.show-meta .meta {
+  display: flex;
+}
+
+/* Hidden twin of the description, used to count how many lines the text takes */
+.measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  font-size: 16px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 /* Toast: a short message with an optional Undo */
 .toast {
+  z-index: 9; /* above the full-screen pages, so Undo is never hidden */
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -563,22 +771,21 @@ h1, h2 {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 90px); /* room for the add bar */
 }
 
 .all-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  min-height: 56px;
+  min-height: 64px;
   padding: 0 20px;
-  border-top: 0.5px solid var(--line);
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .all-name {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -596,48 +803,43 @@ h1, h2 {
   color: var(--accent);
 }
 
-.all-row.new {
-  justify-content: flex-start;
-  color: var(--accent);
-}
-
-/* Dots: which list you are on, centred beside the plus button */
+/* Dots: which list you are on, just above the add bar */
 .dots {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
   display: flex;
   align-items: center;
-  height: 44px;
+  height: 28px;
   z-index: 3;
 }
 
 .dot {
-  width: 13px;
-  height: 44px;
+  width: 12px;
+  height: 28px;
   display: grid;
   place-items: center;
 }
 
 .dot::before {
   content: '';
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--text-muted);
   opacity: 0.5;
 }
 
 .dot[aria-current='true']::before {
-  width: 9px;
-  height: 9px;
-  background: var(--accent);
+  width: 8px;
+  height: 8px;
+  background: var(--text);
   opacity: 1;
 }
 
 .dots-count {
-  height: 44px;
+  height: 28px;
   padding: 0 14px;
   font-size: 13px;
   color: var(--text-muted);
@@ -668,4 +870,52 @@ h1, h2 {
   font-weight: 500;
   color: inherit;
   text-decoration: underline;
+}
+
+
+/* Archive screen */
+.screen > .header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arch-heading {
+  padding: 18px 20px 6px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.arch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 8px 0 20px;
+}
+
+.arch-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.arch-name,
+.arch-sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.arch-name { font-size: 17px; }
+.arch-sub { font-size: 13px; color: var(--text-muted); }
+
+.arch-row .icon-btn.sure {
+  width: auto;
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--danger);
 }

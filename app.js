@@ -20,6 +20,9 @@ const $ = (id) => document.getElementById(id);
 const el = {
   app: $('app'),
   grab: $('grab'),
+  who: $('who'),
+  whos: $('whos'),
+  tileIcon: $('tile-icon'),
   title: $('title'),
   titleInput: $('title-input'),
   stage: $('stage'),
@@ -27,13 +30,19 @@ const el = {
   add: $('add'),
   scrim: $('scrim'),
   drawer: $('drawer'),
-  chip: $('chip'),
   trash: $('trash'),
   itemTitle: $('item-title'),
   itemBody: $('item-body'),
   foot: $('drawer-top'),
   hint: $('hint'),
+  hintIcon: $('hint-icon'),
+  hintText: $('hint-text'),
   done: $('done'),
+  doneIcon: $('done-icon'),
+  bookmark: $('bookmark'),
+  meta: $('meta'),
+  metaDate: $('meta-date'),
+  metaList: $('meta-list'),
   toast: $('toast'),
   menuBtn: $('menu-btn'),
   menuScrim: $('menu-scrim'),
@@ -41,15 +50,26 @@ const el = {
   allLists: $('all-lists'),
   allRows: $('all-rows'),
   allNew: $('all-new'),
+  archive: $('archive'),
+  archiveBody: $('archive-body'),
+  archiveBack: $('archive-back'),
+  trashIcon: $('trash-icon'),
   dots: $('dots'),
   header: $('header'),
   banner: $('banner'),
   bannerText: $('banner-text'),
+  selbar: $('selbar'),
+  selFill: $('sel-fill'),
+  selHint: $('sel-hint'),
+  selKnob: $('sel-knob'),
+  selX: $('sel-x'),
   bannerAction: $('banner-action'),
 };
 
 // Everything on screen is drawn from this object. IndexedDB is the saved copy.
-const state = { lists: [], items: [], currentId: null };
+// lists and items are the live ones. Archived lists and items wait in `archive` until
+// they are restored or deleted for good.
+const state = { lists: [], items: [], currentId: null, archive: { lists: [], items: [] } };
 
 // Find the list by id. An index would shift whenever a list is deleted.
 const currentList = () => state.lists.find((l) => l.id === state.currentId);
@@ -105,6 +125,12 @@ function saveEverything() {
 
 // Which list you were looking at is a per-device habit, not part of your
 // data, so it lives in localStorage rather than IndexedDB (and not in exports).
+// The icons a list can have. Anything else (or nothing) falls back to the plain list icon,
+// which also means the name can never be used to smuggle odd text into an href.
+const LIST_ICONS = ['flame', 'compass', 'mountain', 'map', 'tent', 'anchor', 'moon', 'sun', 'leaf', 'star', 'heart', 'list'];
+const iconOf = (list) => (LIST_ICONS.includes(list.icon) ? list.icon : 'list');
+const iconHref = (list) => `#i-${iconOf(list)}`;
+
 const LAST_LIST_KEY = 'find-notes:last-list';
 
 function rememberList(id) {
@@ -117,6 +143,7 @@ function recallList() {
 
 function switchTo(id) {
   hideToast(); // an Undo for something on the list you just left would make no sense
+  clearSelection();
   state.currentId = id;
   rememberList(id);
   render();
@@ -126,13 +153,18 @@ function switchTo(id) {
 /* ---------- loading ---------- */
 
 async function load() {
-  state.lists = (await db.getAll('lists')).sort((a, b) => a.order - b.order);
-  state.items = await db.getAll('items');
+  const lists = await db.getAll('lists');
+  const items = await db.getAll('items');
+  const newest = (a, b) => b.archivedAt - a.archivedAt;
+  state.lists = lists.filter((l) => !l.archivedAt).sort((a, b) => a.order - b.order);
+  state.items = items.filter((i) => !i.archivedAt);
+  state.archive.lists = lists.filter((l) => l.archivedAt).sort(newest);
+  state.archive.items = items.filter((i) => i.archivedAt).sort(newest);
 }
 
 // Sample data from the mockup, only used when the database is empty.
 async function seed() {
-  const home = { id: db.uid(), name: 'Home', order: 0 };
+  const home = { id: db.uid(), name: 'Home', icon: 'flame', order: 0 };
   await db.put('lists', home);
 
   const samples = [
@@ -151,9 +183,11 @@ async function seed() {
 
 /* ---------- drawing ---------- */
 
+const selection = new Set(); // ids of the rows picked with a long-press
+
 function renderRow(item) {
   const row = document.createElement('div');
-  row.className = 'row' + (item.done ? ' done' : '');
+  row.className = 'row' + (item.done ? ' done' : '') + (selection.has(item.id) ? ' selected' : '');
   row.dataset.id = item.id;
   row.setAttribute('role', 'listitem');
 
@@ -179,15 +213,20 @@ function renderRow(item) {
 }
 
 function renderEmpty() {
-  const p = document.createElement('p');
-  p.className = 'empty';
-  p.textContent = 'Start your list. Tap the plus to add an item.';
-  return p;
+  const box = document.createElement('div');
+  box.className = 'empty';
+  const title = document.createElement('strong');
+  title.textContent = 'A blank page';
+  const hint = document.createElement('span');
+  hint.textContent = 'Add your first item below.';
+  box.append(title, hint);
+  return box;
 }
 
 function render() {
   const list = currentList();
   el.title.textContent = list.name;
+  el.tileIcon.setAttribute('href', iconHref(list));
 
   const items = itemsOf(list.id);
   el.list.replaceChildren(...(items.length ? items.map(renderRow) : [renderEmpty()]));
@@ -205,6 +244,8 @@ el.list.addEventListener('click', (e) => {
   const item = state.items.find((i) => i.id === row.dataset.id);
   if (!item) return;
 
+  if (selection.size) { toggleSelected(item.id); return; } // while selecting, a tap picks or unpicks
+
   if (e.target.closest('.check')) {
     item.done = !item.done;
     item.updatedAt = Date.now();
@@ -217,7 +258,7 @@ el.list.addEventListener('click', (e) => {
 
 /* ---------- adding an item ---------- */
 
-function addItem(title, body) {
+function addItem(title, body, extras = {}) {
   const list = currentList();
   const siblings = itemsOf(list.id);
   const now = Date.now();
@@ -233,6 +274,7 @@ function addItem(title, body) {
     order: siblings.length ? siblings[siblings.length - 1].order + 1 : 0,
     createdAt: now,
     updatedAt: now,
+    bookmarked: !!extras.bookmarked,
   };
 
   state.items.push(item);
@@ -302,29 +344,144 @@ function showToast(message, onUndo, ms = 4000) {
   toastTimer = setTimeout(hideToast, ms);
 }
 
+/* ---------- the draft: a new note nobody has added yet ---------- */
+
+// One slot, kept apart from the real items so a half-written note never shows up in the
+// list. localStorage because it can be written in one go when the page is being closed.
+const DRAFT_KEY = 'find-notes-draft';
+
+function readDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+    return d && (d.title?.trim() || d.body?.trim()) ? d : null;
+  } catch { return null; }
+}
+
+function writeDraft(draft) {
+  try {
+    if (draft) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch { /* private mode or full: the draft is a bonus, never a reason to complain */ }
+}
+
 /* ---------- the drawer ---------- */
 
 // null when closed, otherwise { mode: 'add' | 'edit', item }
 let drawer = null;
 let saveTimer = null;
+let maxTimer = null;
+const AUTOSAVE_IDLE_MS = 5000;  // editing saves itself 5 seconds after you pause...
+const AUTOSAVE_MAX_MS = 60000;  // ...or a minute after the first unsaved change, however long you type
+const cancelSave = () => { clearTimeout(saveTimer); clearTimeout(maxTimer); saveTimer = maxTimer = null; };
+
+let hintError = '';
+let story = false;     // derived from the text, never stored
+let expanded = false;  // is the sheet more than half way up?
 
 function setHint(message, isError = false) {
-  el.hint.textContent = message;
+  hintError = isError ? message : '';
   el.foot.classList.toggle('error', isError);
+  refreshHint();
 }
+
+// An error wins; otherwise a long note at the small size is told how to keep writing.
+function refreshHint() {
+  const swipeHint = drawer && story && !expanded ? 'Swipe up to keep writing' : '';
+  const saved = hintError ? '' : savedText();
+  el.hintText.textContent = hintError || saved || swipeHint;
+  el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
+}
+
+// "Saved just now" / "Saved 2 min ago" (for a new note: "Draft saved ..."). It stays while you
+// type again; the gold tick says there is something newer.
+function ago(t) {
+  const mins = Math.floor((Date.now() - t) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
+function savedText() {
+  if (!drawer?.savedAt) return '';
+  return (drawer.mode === 'add' ? 'Draft saved ' : 'Saved ') + ago(drawer.savedAt);
+}
+setInterval(() => { if (drawer?.savedAt) refreshHint(); }, 15000);
+
+// A hidden copy of the description tells us how many lines the text really takes.
+const measure = document.createElement('div');
+measure.className = 'measure';
+measure.setAttribute('aria-hidden', 'true');
+el.drawer.append(measure);
+
+const PEEK_LINES = 3;
+function linesOf(text) {
+  measure.style.width = el.itemBody.clientWidth + 'px';
+  measure.textContent = text.endsWith('\n') ? text + ' ' : text || ' ';
+  return Math.round(measure.scrollHeight / 24);
+}
+
+// Whether the description has outgrown the small sheet. (Stories will build on this later.)
+function updateKind() {
+  story = linesOf(el.itemBody.value) > PEEK_LINES;
+  syncMeta();
+  refreshHint();
+}
+
+function syncMeta() {
+  el.drawer.classList.toggle('show-meta', !!drawer && expanded);
+}
+
+// Gold plus: adding. White tick: saved. Gold tick: changes still on their way to being saved.
+function updateCommit() {
+  const adding = drawer?.mode === 'add';
+  const state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
+  el.done.dataset.state = state;
+  el.doneIcon.setAttribute('href', adding ? '#i-plus' : '#i-check');
+  const label = adding ? 'Add' : drawer?.pending ? 'Save and close' : 'Close';
+  if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
+}
+
+// Adding: clear the draft so you can start again. Editing: nothing to show.
+function updateTrash() {
+  if (!drawer) return;
+  const adding = drawer.mode === 'add';
+  // Only a new note has a bin (clear the draft). Archiving happens from the list, not inside a note.
+  el.trash.hidden = !adding || (!el.itemTitle.value.trim() && !el.itemBody.value.trim());
+  el.trash.setAttribute('aria-label', adding ? 'Clear draft' : 'Archive item');
+  el.trashIcon.setAttribute('href', adding ? '#i-trash' : '#i-archive');
+}
+
+function setBookmark(on) {
+  el.bookmark.setAttribute('aria-pressed', String(on));
+  el.bookmark.setAttribute('aria-label', on ? 'Remove bookmark' : 'Bookmark');
+}
+
+const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 function showDrawer(mode, item) {
   // `original` is what the item looked like when it opened, so a swipe-down can put it back
-  drawer = { mode, item, original: item && { title: item.title, body: item.body, updatedAt: item.updatedAt } };
+  drawer = {
+    mode, item, pending: false, bookmarked: !!item?.bookmarked,
+    original: item && { title: item.title, body: item.body, updatedAt: item.updatedAt },
+  };
   hideToast();
 
-  el.chip.textContent = currentList().name;
-  el.itemTitle.value = item ? item.title : '';
-  el.itemBody.value = item ? item.body : '';
-  el.trash.hidden = mode !== 'edit';
-  el.done.setAttribute('aria-label', mode === 'add' ? 'Add' : 'Done');
+  const draft = mode === 'add' ? readDraft() : null; // an unfinished note comes back
+  if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.savedAt = draft.t; }
+  el.itemTitle.value = item ? item.title : draft?.title ?? '';
+  el.itemBody.value = item ? item.body : draft?.body ?? '';
+  updateTrash();
+  el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
+  el.metaList.textContent = currentList().name;
+  setBookmark(drawer.bookmarked);
+  expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
   setHint('');
+  updateKind();
+  updateCommit();
 
   lockBackground();
   el.drawer.classList.remove('closing');
@@ -332,6 +489,7 @@ function showDrawer(mode, item) {
   el.drawer.classList.add('open');
   el.scrim.classList.add('open');
   fitViewport();
+  watchViewport();
   animateSheet(PEEK);
 
   // Opening an existing item to read it shouldn't throw the keyboard up, so focus
@@ -344,7 +502,7 @@ const openAdd = () => showDrawer('add', null);
 const openEdit = (item) => showDrawer('edit', item);
 
 function hideDrawer() {
-  clearTimeout(saveTimer);
+  cancelSave();
   el.itemTitle.blur();
   el.itemBody.blur();
   drag = null;
@@ -366,20 +524,40 @@ function hideDrawer() {
 function readEdits(item) {
   item.title = el.itemTitle.value.trim() || 'Untitled';
   item.body = el.itemBody.value.trimEnd();
+  item.bookmarked = drawer ? drawer.bookmarked : !!item.bookmarked;
   item.updatedAt = Date.now();
 }
 
-// Edits are saved as you type, a moment after you pause.
+// Edits save themselves (see scheduleSave) and when you leave the app; the tick saves straight away.
 function saveEdit() {
-  clearTimeout(saveTimer);
+  cancelSave();
+  if (drawer?.mode === 'add') {
+    const title = el.itemTitle.value;
+    const body = el.itemBody.value;
+    const empty = !title.trim() && !body.trim();
+    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, t: Date.now() });
+    drawer.savedAt = empty ? 0 : Date.now();
+    refreshHint();
+    return;
+  }
   if (drawer?.mode !== 'edit') return;
   readEdits(drawer.item);
+  drawer.pending = false;
+  // Swiping down now only throws away what was typed after this save.
+  drawer.original = { title: drawer.item.title, body: drawer.item.body, updatedAt: drawer.item.updatedAt };
+  drawer.savedAt = Date.now();
+  updateCommit();
+  refreshHint();
   save(db.put('items', drawer.item));
 }
 
+// Two clocks: the idle one restarts on every keystroke, the other starts at the first
+// unsaved change and is never pushed back, so a long burst of typing still saves.
 const scheduleSave = () => {
+  if (drawer) { drawer.pending = true; updateCommit(); refreshHint(); }
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveEdit, 300);
+  saveTimer = setTimeout(saveEdit, AUTOSAVE_IDLE_MS);
+  if (!maxTimer) maxTimer = setTimeout(saveEdit, AUTOSAVE_MAX_MS);
 };
 
 // Done: keeps what you typed. Adding needs a title, editing saves the fields.
@@ -388,7 +566,10 @@ function closeDrawer() {
 
   if (drawer.mode === 'add') {
     const title = el.itemTitle.value.trim();
-    if (title) addItem(title, el.itemBody.value.trim());
+    if (title) {
+      addItem(title, el.itemBody.value.trim(), { bookmarked: drawer.bookmarked });
+      writeDraft(null);
+    }
   } else {
     readEdits(drawer.item);
     save(db.put('items', drawer.item));
@@ -411,15 +592,32 @@ el.done.addEventListener('click', () => {
 
 el.itemTitle.addEventListener('input', () => {
   setHint('');
+  updateTrash();
   scheduleSave();
 });
-el.itemBody.addEventListener('input', scheduleSave);
+el.itemBody.addEventListener('input', () => {
+  updateKind();
+  updateTrash();
+  scheduleSave();
+});
+
+el.bookmark.addEventListener('click', () => {
+  if (!drawer) return;
+  drawer.bookmarked = !drawer.bookmarked;
+  setBookmark(drawer.bookmarked);
+  if (drawer.mode === 'add') scheduleSave();
+  // A bookmark isn't a change to the text, so it saves at once and leaves the tick alone.
+  if (drawer.mode === 'edit') {
+    drawer.item.bookmarked = drawer.bookmarked;
+    save(db.put('items', drawer.item));
+  }
+});
 
 // Enter in the title moves to the description instead of submitting.
 el.itemTitle.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    el.itemBody.focus();
+    el.itemBody.focus({ preventScroll: true }); // a scrolled page is what broke the sheet
   }
 });
 
@@ -428,6 +626,8 @@ el.itemTitle.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!el.menu.hidden) closeMenu();
+  else if (selection.size && el.archive.hidden && el.allLists.hidden && !drawer) clearSelection();
+  else if (!el.archive.hidden) closeArchive();
   else if (!el.allLists.hidden) closeAll();
   else dismissDrawer();
 });
@@ -436,8 +636,13 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) saveEdit();
 });
+addEventListener('pagehide', saveEdit);
 
 /* ---------- the sheet: dragging, snapping, keyboard ---------- */
+
+// The page itself never scrolls. iOS likes to scroll it to reveal a focused field, which
+// shows up as a scroll bar and a jump, so put it straight back.
+addEventListener('scroll', () => { if (scrollY || scrollX) scrollTo(0, 0); }, { passive: true });
 
 // Three resting heights: closed (0), small (PEEK) and the whole screen (fullHeight()).
 const PEEK = 250;
@@ -462,10 +667,15 @@ function setSheet(h) {
   el.drawer.style.setProperty('--full', clamp((h - PEEK) / (full - PEEK || 1), 0, 1).toFixed(3));
   el.scrim.style.opacity = Math.min(1, h / PEEK).toFixed(3);
 
-  const expanded = String(h > (PEEK + full) / 2);
-  if (el.grab.getAttribute('aria-expanded') !== expanded) {
-    el.grab.setAttribute('aria-expanded', expanded);
-    el.grab.setAttribute('aria-label', expanded === 'true' ? 'Make note smaller' : 'Expand note');
+  const isExpanded = h > (PEEK + full) / 2;
+  if (isExpanded !== expanded) {
+    expanded = isExpanded;
+    syncMeta();
+    refreshHint();
+  }
+  if (el.grab.getAttribute('aria-expanded') !== String(expanded)) {
+    el.grab.setAttribute('aria-expanded', String(expanded));
+    el.grab.setAttribute('aria-label', expanded ? 'Make note smaller' : 'Expand note');
   }
 }
 
@@ -496,24 +706,29 @@ function animateSheet(to) {
 // (which sits at the bottom of the app) needs no keyboard maths of its own. On an
 // iPhone the browser also pans the page; the transform undoes that.
 let lastFull = 0;
-let wasKeyboard = false;
+let view = { keyboard: false, height: 0, top: 0 }; // what we last laid out for
 let settleTimer = 0;
+let watching = 0;
 const typingInSheet = () =>
   !!drawer && (document.activeElement === el.itemTitle || document.activeElement === el.itemBody);
 
 function fitViewport(settled) {
   const keyboard = !!vv && innerHeight - vv.height > 120;
+  const height = vv ? Math.round(vv.height) : 0;
+  const top = keyboard ? Math.round(vv.offsetTop) : 0;
+  if (keyboard === view.keyboard && height === view.height && top === view.top) return; // nothing changed
 
   // Moving from the title to the description makes the browser report "no keyboard" for a
   // moment. While a field has focus, wait and see before believing it.
-  clearTimeout(settleTimer);
-  if (!keyboard && wasKeyboard && settled !== true && typingInSheet()) {
-    settleTimer = setTimeout(() => fitViewport(true), 300);
+  if (!keyboard && view.keyboard && settled !== true && typingInSheet()) {
+    if (!settleTimer) settleTimer = setTimeout(() => { settleTimer = 0; fitViewport(true); }, 300);
     return;
   }
+  clearTimeout(settleTimer);
+  settleTimer = 0;
 
-  el.app.style.height = keyboard ? vv.height + 'px' : '';
-  el.app.style.transform = keyboard && vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
+  el.app.style.height = keyboard ? height + 'px' : '';
+  el.app.style.transform = top ? `translateY(${top}px)` : '';
   el.drawer.classList.toggle('kb', keyboard);
 
   const full = fullHeight();
@@ -521,12 +736,24 @@ function fitViewport(settled) {
     // A full-page sheet stays full-page, just above the keyboard instead of behind it.
     const wasFull = lastFull > PEEK && sheetH >= lastFull - 2;
     const target = wasFull ? full : Math.min(sheetH, full);
-    if (keyboard !== wasKeyboard) animateSheet(target); // glide as the keyboard comes or goes
+    if (keyboard !== view.keyboard) animateSheet(target); // glide as the keyboard comes or goes
     else setSheet(target);
   }
   lastFull = full;
-  wasKeyboard = keyboard;
+  view = { keyboard, height, top };
 }
+
+// iPhones don't always announce every change in the visible area (moving between fields is
+// the worst), so while the sheet or the keyboard is up, look again on every frame.
+// It costs next to nothing: when nothing has changed, fitViewport returns at once.
+function watchViewport() {
+  if (watching) return;
+  watching = setInterval(() => {
+    fitViewport();
+    if (!drawer && !view.keyboard) { clearInterval(watching); watching = 0; }
+  }, 120);
+}
+
 // When focus leaves the fields the keyboard really is going away, so re-check.
 el.drawer.addEventListener('focusout', () => setTimeout(() => fitViewport(true), 200));
 vv?.addEventListener('resize', fitViewport);
@@ -591,7 +818,7 @@ function endDrag(e) {
 // While the sheet is open, a finger moving over anything but the description must not
 // scroll the page (on an iPhone that pulls down to refresh the app).
 document.addEventListener('touchmove', (e) => {
-  if (drawer && !e.target.closest('#item-body')) e.preventDefault();
+  if (drawer && el.drawer.classList.contains('open') && !e.target.closest('#item-body')) e.preventDefault();
 }, { passive: false });
 
 el.drawer.addEventListener('pointerup', endDrag);
@@ -608,15 +835,14 @@ el.grab.addEventListener('click', () => {
 function dismissDrawer() {
   if (!drawer) return;
   const { mode, item, original } = drawer;
-  clearTimeout(saveTimer);
+  cancelSave();
   const title = el.itemTitle.value;
   const body = el.itemBody.value;
+  const bookmarked = drawer.bookmarked;
 
   if (mode === 'add') {
+    saveEdit(); // closing keeps what you wrote as the draft; the bin clears it
     hideDrawer();
-    if (title.trim() || body.trim()) {
-      showToast('Note discarded', () => addItem(title.trim() || 'Untitled', body.trim()));
-    }
     return;
   }
 
@@ -638,30 +864,63 @@ function dismissDrawer() {
   });
 }
 
-/* ---------- deleting an item ---------- */
+/* ---------- archiving an item ---------- */
 
 el.trash.addEventListener('click', () => {
-  if (drawer?.mode !== 'edit') return;
-  const item = drawer.item;
-  readEdits(item); // so Undo brings back the latest text
+  if (drawer?.mode === 'add') {
+    cancelSave();
+    writeDraft(null);
+    el.itemTitle.value = '';
+    el.itemBody.value = '';
+    drawer.bookmarked = false;
+    drawer.savedAt = 0;
+    setBookmark(false);
+    updateKind();
+    updateTrash();
+    refreshHint();
+    el.itemTitle.focus();
+    return;
+  }
+});
 
-  state.items = state.items.filter((i) => i.id !== item.id);
-  save(db.remove('items', item.id));
-  hideDrawer();
+// Archiving keeps everything, it just moves items out of sight. Their place in the
+// list is kept, so restoring puts them back where they were.
+function archiveItems(items) {
+  if (!items.length) return;
+  const now = Date.now();
+  const ids = new Set(items.map((i) => i.id));
+  state.items = state.items.filter((i) => !ids.has(i.id));
+  for (const item of items) item.archivedAt = now;
+  state.archive.items.unshift(...items);
+  save(db.batch({ put: items.map((i) => ['items', i]) }));
+  clearSelection();
   render();
-
-  showToast('Item deleted', () => {
-    state.items.push(item);
-    save(db.put('items', item));
+  showToast(items.length === 1 ? 'Item archived' : `${items.length} items archived`, () => {
+    state.archive.items = state.archive.items.filter((i) => !ids.has(i.id));
+    for (const item of items) {
+      delete item.archivedAt;
+      state.items.push(item);
+    }
+    save(db.batch({ put: items.map((i) => ['items', i]) }));
     render();
   });
-});
+}
+
+function restoreItem(item, toListId = item.listId) {
+  state.archive.items = state.archive.items.filter((i) => i.id !== item.id);
+  delete item.archivedAt;
+  delete item.archivedWith;
+  item.listId = state.lists.some((l) => l.id === toListId) ? toListId : state.currentId;
+  state.items.push(item);
+  save(db.put('items', item));
+  render();
+}
 
 /* ---------- the three-dots menu ---------- */
 
 function openMenu() {
-  // You can't delete your only list, so say so by greying it out.
-  el.menu.querySelector('[data-action="delete"]').disabled = state.lists.length < 2;
+  // You can't archive your only list, so say so by greying it out.
+  el.menu.querySelector('[data-action="archive-list"]').disabled = state.lists.length < 2;
   lockBackground();
   el.menu.hidden = false;
   el.menuScrim.hidden = false;
@@ -684,7 +943,7 @@ el.menu.addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
   closeMenu();
-  ({ all: openAll, new: newList, rename: startRename, delete: deleteList })[action]();
+  ({ all: openAll, new: newList, rename: startRename, 'archive-list': archiveList, archive: openArchive })[action]();
 });
 
 /* ---------- the All lists screen ---------- */
@@ -697,9 +956,14 @@ function renderAll() {
     row.className = 'all-row' + (list.id === state.currentId ? ' current' : '');
     row.dataset.id = list.id;
     if (list.id === state.currentId) row.setAttribute('aria-current', 'true');
-    row.innerHTML = '<span class="all-name"></span><span class="all-count"></span>';
+    row.innerHTML = `
+      <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+      <span class="all-name"></span>
+      <span class="all-count"></span>`;
+    row.querySelector('use').setAttribute('href', iconHref(list));
     row.querySelector('.all-name').textContent = list.name;
-    row.querySelector('.all-count').textContent = `${open} open`;
+    row.querySelector('.all-count').textContent = String(open);
+    row.setAttribute('aria-label', `${list.name}, ${open} open`);
     return row;
   });
   el.allRows.replaceChildren(...rows);
@@ -734,7 +998,7 @@ el.allNew.addEventListener('click', () => {
 
 function newList() {
   const last = state.lists[state.lists.length - 1];
-  const list = { id: db.uid(), name: 'New list', order: last ? last.order + 1 : 0 };
+  const list = { id: db.uid(), name: 'New list', icon: 'list', order: last ? last.order + 1 : 0 };
   state.lists.push(list);
   save(db.put('lists', list));
   switchTo(list.id);
@@ -774,7 +1038,7 @@ el.titleInput.addEventListener('keydown', (e) => {
 });
 el.titleInput.addEventListener('blur', () => finishRename(true));
 
-function deleteList() {
+function archiveList() {
   if (state.lists.length < 2) {
     showToast('Keep at least one list');
     return;
@@ -782,29 +1046,156 @@ function deleteList() {
 
   const list = currentList();
   const index = state.lists.indexOf(list);
-  const removedItems = itemsOf(list.id);
+  const items = itemsOf(list.id);
+  const now = Date.now();
 
+  list.archivedAt = now;
+  for (const item of items) { item.archivedAt = now; item.archivedWith = list.id; }
   state.lists.splice(index, 1);
   state.items = state.items.filter((i) => i.listId !== list.id);
-  // One transaction: the list and its items go together, or not at all.
-  save(db.batch({
-    remove: [['lists', list.id], ...removedItems.map((i) => ['items', i.id])],
-  }));
+  state.archive.lists.unshift(list);
+  state.archive.items.unshift(...items);
+  // One transaction: the list and its items are archived together, or not at all.
+  save(db.batch({ put: [['lists', list], ...items.map((i) => ['items', i])] }));
 
   // Land on the list that took its place, or the new last one.
   switchTo(state.lists[Math.min(index, state.lists.length - 1)].id);
 
-  // A whole list is a bigger loss than one item, so Undo stays a bit longer.
-  showToast('List deleted', () => {
-    state.lists.push(list);
-    state.lists.sort((a, b) => a.order - b.order);
-    state.items.push(...removedItems);
-    save(db.batch({
-      put: [['lists', list], ...removedItems.map((i) => ['items', i])],
-    }));
+  // A whole list is a bigger move than one item, so Undo stays a bit longer.
+  showToast('List archived', () => {
+    restoreList(list);
     switchTo(list.id);
   }, 6000);
 }
+
+function restoreList(list) {
+  const items = state.archive.items.filter((i) => i.archivedWith === list.id);
+  state.archive.lists = state.archive.lists.filter((l) => l.id !== list.id);
+  state.archive.items = state.archive.items.filter((i) => i.archivedWith !== list.id);
+  delete list.archivedAt;
+  for (const item of items) { delete item.archivedAt; delete item.archivedWith; }
+  state.lists.push(list);
+  state.lists.sort((a, b) => a.order - b.order);
+  state.items.push(...items);
+  save(db.batch({ put: [['lists', list], ...items.map((i) => ['items', i])] }));
+  render();
+}
+
+/* ---------- the Archive screen ---------- */
+
+const listNameOf = (id) =>
+  [...state.lists, ...state.archive.lists].find((l) => l.id === id)?.name ?? 'Deleted list';
+
+function archiveRow(kind, record) {
+  const row = document.createElement('div');
+  row.className = 'arch-row';
+  row.dataset.kind = kind;
+  row.dataset.id = record.id;
+  row.innerHTML = `
+    <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
+    <span class="arch-text"><span class="arch-name"></span><span class="arch-sub"></span></span>
+    <button class="icon-btn" data-act="restore"><svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg></button>
+    <button class="icon-btn" data-act="delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>`;
+  const name = kind === 'list' ? record.name : record.title;
+  row.querySelector('.arch-name').textContent = name;
+  const when = ago(record.archivedAt);
+  if (kind === 'list') {
+    const count = state.archive.items.filter((i) => i.archivedWith === record.id).length;
+    row.querySelector('use').setAttribute('href', iconHref(record));
+    row.querySelector('.arch-sub').textContent = `${count} ${count === 1 ? 'item' : 'items'} \u00b7 archived ${when}`;
+  } else {
+    row.querySelector('use').setAttribute('href', '#i-note');
+    row.querySelector('.arch-sub').textContent = `${listNameOf(record.listId)} \u00b7 archived ${when}`;
+  }
+  row.querySelector('[data-act="restore"]').setAttribute('aria-label', `Restore ${name}`);
+  row.querySelector('[data-act="delete"]').setAttribute('aria-label', `Delete ${name} permanently`);
+  return row;
+}
+
+function renderArchive() {
+  const lists = state.archive.lists;
+  // Items archived along with a list live inside that list, so they aren't shown twice.
+  const items = state.archive.items.filter((i) => !i.archivedWith || !lists.some((l) => l.id === i.archivedWith));
+  const nodes = [];
+  const heading = (text) => {
+    const h = document.createElement('div');
+    h.className = 'arch-heading';
+    h.textContent = text;
+    return h;
+  };
+  if (lists.length) nodes.push(heading('Lists'), ...lists.map((l) => archiveRow('list', l)));
+  if (items.length) nodes.push(heading('Items'), ...items.map((i) => archiveRow('item', i)));
+  if (!nodes.length) {
+    const box = renderEmpty();
+    box.querySelector('strong').textContent = 'Nothing archived';
+    box.querySelector('span').textContent = 'Lists and items you archive wait here.';
+    nodes.push(box);
+  }
+  el.archiveBody.replaceChildren(...nodes);
+}
+
+function openArchive() {
+  renderArchive();
+  lockBackground();
+  el.archive.hidden = false;
+  el.archiveBack.focus();
+}
+
+function closeArchive() {
+  el.archive.hidden = true;
+  unlockBackground();
+  restoreFocus();
+}
+
+el.archiveBack.addEventListener('click', closeArchive);
+
+// Deleting for good is asked twice: the bin turns into "Delete" for a few seconds.
+let sureTimer = 0;
+function disarm() {
+  clearTimeout(sureTimer);
+  el.archiveBody.querySelectorAll('.sure').forEach((b) => {
+    b.classList.remove('sure');
+    b.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>';
+  });
+}
+
+el.archiveBody.addEventListener('click', (e) => {
+  const button = e.target.closest('button[data-act]');
+  const row = e.target.closest('.arch-row');
+  if (!button || !row) return;
+  const { kind, id } = row.dataset;
+
+  if (button.dataset.act === 'restore') {
+    if (kind === 'list') {
+      restoreList(state.archive.lists.find((l) => l.id === id));
+    } else {
+      const item = state.archive.items.find((i) => i.id === id);
+      restoreItem(item, item.listId);
+    }
+    renderArchive();
+    showToast(kind === 'list' ? 'List restored' : 'Item restored');
+    return;
+  }
+
+  if (!button.classList.contains('sure')) {
+    disarm();
+    button.classList.add('sure');
+    button.textContent = 'Delete';
+    sureTimer = setTimeout(disarm, 3000);
+    return;
+  }
+  clearTimeout(sureTimer);
+  if (kind === 'list') {
+    const items = state.archive.items.filter((i) => i.archivedWith === id);
+    state.archive.lists = state.archive.lists.filter((l) => l.id !== id);
+    state.archive.items = state.archive.items.filter((i) => i.archivedWith !== id);
+    save(db.batch({ remove: [['lists', id], ...items.map((i) => ['items', i.id])] }));
+  } else {
+    state.archive.items = state.archive.items.filter((i) => i.id !== id);
+    save(db.remove('items', id));
+  }
+  renderArchive();
+});
 
 /* ---------- the dots ---------- */
 
@@ -881,6 +1272,54 @@ function clearTrack(track) {
   for (const { node } of track) node.style.transform = '';
 }
 
+// The icon and name stay in place while the list slides. The current ones fade out and
+// the neighbour's fade in. A ghost is a copy of the header identity for another list.
+function makeGhost(list) {
+  const ghost = el.who.cloneNode(true);
+  ghost.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
+  ghost.removeAttribute('id');
+  ghost.querySelector('input')?.remove();
+  const name = ghost.querySelector('h1');
+  name.hidden = false;
+  name.textContent = list.name;
+  ghost.querySelector('use').setAttribute('href', iconHref(list));
+  ghost.classList.add('ghost');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.inert = true;
+  ghost.style.opacity = '0';
+  el.whos.append(ghost);
+  return ghost;
+}
+
+// Follow the finger: the current identity is gone by halfway, the next one arrives after.
+function fadeHeader(ghosts, dx) {
+  const progress = Math.min(1, Math.abs(dx) / el.stage.offsetWidth);
+  el.who.style.opacity = String(Math.max(0, 1 - 2 * progress));
+  const showing = dx < 0 ? 1 : -1;
+  for (const [direction, ghost] of Object.entries(ghosts)) {
+    ghost.style.opacity = Number(direction) === showing ? String(Math.max(0, 2 * progress - 1)) : '0';
+  }
+}
+
+// Finish the fade from wherever it is. `arrive` is the direction whose ghost should end
+// fully visible, or 0 when the swipe is cancelled and the current list comes back.
+function settleHeader(ghosts, arrive) {
+  const fade = (node, to) => node.animate(
+    [{ opacity: parseFloat(node.style.opacity || '1') }, { opacity: to }],
+    { duration: ms(200), easing: 'ease-out', fill: 'forwards' },
+  );
+  return [
+    fade(el.who, arrive ? 0 : 1),
+    ...Object.entries(ghosts).map(([direction, ghost]) => fade(ghost, Number(direction) === arrive ? 1 : 0)),
+  ];
+}
+
+function endHeader(ghosts, animations) {
+  Object.values(ghosts).forEach((ghost) => ghost.remove());
+  animations.forEach((a) => a.cancel());
+  el.who.style.opacity = '';
+}
+
 // Slide the whole track from one position to another.
 function settle(track, from, to) {
   const width = el.stage.offsetWidth;
@@ -916,28 +1355,33 @@ function endTrack(track, animations) {
 //   animating = false;
 // }
 
-async function slideTo(target, direction, from = 0, track = null) {
-    if (animating) return;
-    animating = true;
-    try {
+async function slideTo(target, direction, from = 0, track = null, ghosts = null) {
+  if (animating) return;
+  animating = true;
+  try {
     track ??= [{ node: el.list, slot: 0 }, { node: buildPane(target), slot: direction }];
+    ghosts ??= { [direction]: makeGhost(target) };
     clearTrack(track);
+    const headerAnimations = settleHeader(ghosts, direction);
     const animations = await settle(track, from, -direction * el.stage.offsetWidth);
     switchTo(target.id);
     endTrack(track, animations);
-    } finally {
+    endHeader(ghosts, headerAnimations);
+  } finally {
     animating = false;
-    }
+  }
 }
 
 // Too short a drag: everything springs back.
-async function snapBack(track, from) {
+async function snapBack(track, from, ghosts) {
   if (animating) return;
   animating = true;
   try {
     clearTrack(track);
+    const headerAnimations = settleHeader(ghosts, 0);
     const animations = await settle(track, from, 0);
     endTrack(track, animations);
+    endHeader(ghosts, headerAnimations);
   } finally {
     animating = false;
   }
@@ -960,7 +1404,7 @@ let justSwiped = false;
 el.list.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse' || animating || state.lists.length < 2) return;
   if (e.clientX < EDGE || e.clientX > window.innerWidth - EDGE) return;
-  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, time: e.timeStamp, dx: 0, locked: false, track: null };
+  swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, time: e.timeStamp, dx: 0, locked: false, track: null, ghosts: null };
 });
 
 el.list.addEventListener('pointermove', (e) => {
@@ -974,6 +1418,7 @@ el.list.addEventListener('pointermove', (e) => {
     if (Math.abs(dx) < SWIPE_LOCK) return;
 
     swipe.locked = true;
+    cancelHold();
     el.list.setPointerCapture(e.pointerId);
     // Now we know it's a swipe, put both neighbours in place.
     swipe.track = [
@@ -981,16 +1426,18 @@ el.list.addEventListener('pointermove', (e) => {
       { node: buildPane(neighbour(-1)), slot: -1 },
       { node: buildPane(neighbour(1)), slot: 1 },
     ];
+    swipe.ghosts = { [-1]: makeGhost(neighbour(-1)), 1: makeGhost(neighbour(1)) };
   }
 
   const width = el.stage.offsetWidth;
   swipe.dx = Math.max(-width, Math.min(width, dx));
   placeTrack(swipe.track, swipe.dx); // everything follows the finger
+  fadeHeader(swipe.ghosts, swipe.dx);
 });
 
 el.list.addEventListener('pointerup', (e) => {
   if (!swipe || e.pointerId !== swipe.id) return;
-  const { dx, locked, time, track } = swipe;
+  const { dx, locked, time, track, ghosts } = swipe;
   swipe = null;
   if (!locked) return; // just a tap, the click handler deals with it
 
@@ -1002,20 +1449,191 @@ el.list.addEventListener('pointerup', (e) => {
   const far = Math.abs(dx) > SWIPE_DISTANCE || (quick && Math.abs(dx) > 24); // a flick counts too
   if (far) {
     const direction = dx < 0 ? 1 : -1;
-    slideTo(neighbour(direction), direction, dx, track);
+    slideTo(neighbour(direction), direction, dx, track, ghosts);
   } else {
-    snapBack(track, dx);
+    snapBack(track, dx, ghosts);
   }
 });
 
 el.list.addEventListener('pointercancel', () => {
-  if (swipe?.locked) snapBack(swipe.track, swipe.dx);
+  if (swipe?.locked) snapBack(swipe.track, swipe.dx, swipe.ghosts);
   swipe = null;
 });
 
 el.list.addEventListener('click', (e) => {
   if (justSwiped) { e.stopPropagation(); e.preventDefault(); }
 }, true); // capture phase, so it runs before the row handler
+
+/* ---------- long-press a row to select it; slide the bar to archive the selection ---------- */
+
+const HOLD_MS = 450;  // how long to hold before the row is selected
+const HOLD_SLOP = 8;  // a finger that drifts further than this is scrolling or swiping
+let hold = null;      // { id, x, y, timer, row }
+
+function cancelHold() {
+  if (!hold) return;
+  clearTimeout(hold.timer);
+  hold = null;
+}
+
+function updateSelBar() {
+  const n = selection.size;
+  el.selbar.hidden = !n;
+  el.app.classList.toggle('selecting', n > 0);
+  el.selHint.textContent = `${n} selected`;
+  el.selKnob.setAttribute('aria-label', n === 1 ? 'Archive 1 selected item' : `Archive ${n} selected items`);
+}
+
+function toggleSelected(id, force) {
+  const on = force ?? !selection.has(id);
+  if (on) selection.add(id); else selection.delete(id);
+  el.list.querySelector(`.row[data-id="${CSS.escape(id)}"]`)?.classList.toggle('selected', on);
+  updateSelBar();
+}
+
+function clearSelection() {
+  if (!selection.size) return;
+  selection.clear();
+  el.list.querySelectorAll('.row.selected').forEach((r) => r.classList.remove('selected'));
+  updateSelBar();
+}
+
+el.list.addEventListener('pointerdown', (e) => {
+  const row = e.target.closest('.row');
+  if (!row || animating || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (e.target.closest('.check')) return; // holding the tick isn't a request to select
+  justSwiped = false; // a new touch: the click left over from the last one is long gone
+  cancelHold();
+  hold = { id: e.pointerId, x: e.clientX, y: e.clientY, row, timer: 0 };
+  hold.timer = setTimeout(() => {
+    if (!hold) return;
+    const id = row.dataset.id;
+    hold = null;
+    toggleSelected(id);
+    navigator.vibrate?.(12);
+    // The finger lifting would fire a click on the row, which would toggle it straight back.
+    justSwiped = true;
+    setTimeout(() => { justSwiped = false; }, 600);
+  }, HOLD_MS);
+});
+
+el.list.addEventListener('pointermove', (e) => {
+  if (!hold || e.pointerId !== hold.id) return;
+  if (Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > HOLD_SLOP) cancelHold();
+});
+el.list.addEventListener('pointerup', cancelHold);
+el.list.addEventListener('pointercancel', cancelHold);
+
+// Holding a row would otherwise pop up the browser's own menu on some phones
+el.list.addEventListener('contextmenu', (e) => { if (e.target.closest('.row')) e.preventDefault(); });
+
+el.selX.addEventListener('click', clearSelection);
+
+const selectedItems = () => state.items.filter((i) => selection.has(i.id));
+
+// The slide: drag the knob across, past 85% of the way, to archive.
+const COMMIT_AT = 0.85;
+let slide = null; // { id, x, max, dragging }
+
+const slideMax = () => el.selbar.clientWidth - 12 - 44; // knob shrinks to 44px wide while dragging
+
+el.selKnob.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  slide = { id: e.pointerId, x: e.clientX, dragging: false, dx: 0 };
+  el.selKnob.setPointerCapture(e.pointerId);
+  el.selbar.classList.remove('settling', 'nudge');
+});
+
+el.selKnob.addEventListener('pointermove', (e) => {
+  if (!slide || e.pointerId !== slide.id) return;
+  const dx = e.clientX - slide.x;
+  if (!slide.dragging) {
+    if (Math.abs(dx) < 4) return;
+    slide.dragging = true;
+    el.selbar.classList.add('dragging');
+  }
+  slide.dx = clamp(dx, 0, slideMax());
+  el.selKnob.style.left = `${6 + slide.dx}px`;
+  el.selFill.style.width = `${6 + slide.dx + 44 + 6}px`;
+});
+
+function endSlide(e) {
+  if (!slide || e.pointerId !== slide.id) return;
+  const { dragging, dx } = slide;
+  slide = null;
+  if (!dragging) {
+    // A tap isn't enough. Show which way to go. (Keyboard users get the click handler below.)
+    if (e.type === 'pointerup') {
+      el.selbar.classList.remove('nudge');
+      void el.selbar.offsetWidth;
+      el.selbar.classList.add('nudge');
+    }
+    return;
+  }
+  const commit = e.type === 'pointerup' && dx >= slideMax() * COMMIT_AT;
+  if (commit) {
+    navigator.vibrate?.(20);
+    archiveItems(selectedItems());
+    resetSlide(false);
+  } else {
+    resetSlide(true);
+  }
+}
+
+function resetSlide(animate) {
+  const bar = el.selbar;
+  if (animate) bar.classList.add('settling');
+  el.selKnob.style.left = '';
+  el.selFill.style.width = '';
+  bar.classList.remove('dragging');
+  if (!animate) bar.classList.remove('settling');
+  else setTimeout(() => bar.classList.remove('settling'), 250);
+}
+el.selKnob.addEventListener('pointerup', endSlide);
+el.selKnob.addEventListener('pointercancel', endSlide);
+
+// Keyboard or screen reader: Enter/Space on the knob archives directly (a touch tap has detail 1).
+el.selKnob.addEventListener('click', (e) => {
+  if (e.detail === 0) archiveItems(selectedItems());
+});
+
+
+/* ---------- temporary: ?debug shows what the phone reports (remove when swiping is sorted) ---------- */
+
+if (new URLSearchParams(location.search).has('debug')) {
+  const hud = document.createElement('pre');
+  hud.style.cssText = 'position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:99;'
+    + 'margin:0;padding:6px 10px;font:11px/1.35 monospace;background:rgba(0,0,0,.82);color:#9f9;'
+    + 'pointer-events:none;white-space:pre-wrap';
+  document.body.append(hud);
+  const counts = {};
+  let last = '';
+  const show = () => {
+    const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    hud.textContent = [
+      Object.entries(counts).map(([k, v]) => `${k}:${v}`).join(' '),
+      `last: ${last}`,
+      `lists=${state.lists.length} animating=${animating} swipe=${swipe ? (swipe.locked ? 'locked' : 'armed') : 'none'} drawer=${drawer ? drawer.mode : 'null'}`,
+      `vv=${vv ? Math.round(vv.height) : '-'}/${innerHeight} top=${vv ? Math.round(vv.offsetTop) : '-'} app=${el.app.style.height || 'auto'} tf=${el.app.style.transform || 'none'} scrollY=${Math.round(scrollY)}`,
+      `sheet top=${Math.round(el.drawer.getBoundingClientRect().top)} bottom=${Math.round(el.drawer.getBoundingClientRect().bottom)} h=${Math.round(sheetH)}`,
+      `centre of screen hits: ${hit ? (hit.id ? '#' + hit.id : '') + '.' + String(hit.className).slice(0, 30) + ' <' + hit.tagName.toLowerCase() + '>' : 'nothing'}`,
+    ].join('\n');
+  };
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'touchstart', 'touchmove', 'touchend', 'click']) {
+    document.addEventListener(type, (e) => {
+      counts[type] = (counts[type] || 0) + 1;
+      if (type !== 'pointermove' && type !== 'touchmove') {
+        const x = e.clientX ?? e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX ?? 0;
+        last = `${type} ${e.pointerType || ''} x=${Math.round(x)} on ${e.target.id ? '#' + e.target.id : String(e.target.className).slice(0, 24) || e.target.tagName}`;
+      }
+      show();
+    }, true);
+  }
+  vv?.addEventListener('resize', show);
+  vv?.addEventListener('scroll', show);
+  setInterval(show, 150);
+  show();
+}
 
 /* ---------- start ---------- */
 
@@ -1031,8 +1649,9 @@ async function init() {
     // database). Open anyway with one empty list in memory, and say so.
     console.error(error);
     memoryOnly = true;
-    state.lists = [{ id: db.uid(), name: 'Home', order: 0 }];
+    state.lists = [{ id: db.uid(), name: 'Home', icon: 'flame', order: 0 }];
     state.items = [];
+    state.archive = { lists: [], items: [] };
     showBanner(
       "Can't store notes on this device right now. Anything you add will be lost when you close the app.",
       'Try again',
@@ -1047,4 +1666,4 @@ async function init() {
   render();
 }
 
-init();
+init();
