@@ -74,7 +74,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   const typeOf = (b) => ['h', 'li', 'task'].find((t) => b.classList.contains(t)) || 'p';
   const setType = (b, type) => {
     b.className = `b ${type}`;
-    if (type === 'task') delete b.dataset.done; else delete b.dataset.done;
+    delete b.dataset.done;
   };
 
   function inlineNodes(text) {
@@ -335,8 +335,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   }
 
   function afterEdit() {
-    normalize();
-    refreshEmpty();
+    normalize(); // also refreshes the empty state
     onChange();
     onSelection();
   }
@@ -396,7 +395,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   };
 
   function focus() {
-    if (root.contains(document.activeElement) && document.activeElement === root) return;
+    if (document.activeElement === root) return;
     root.focus({ preventScroll: true });
     const sel = getSelection();
     if (!sel.rangeCount || !root.contains(sel.anchorNode)) {
@@ -441,7 +440,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   return {
     getMarkdown,
     setMarkdown,
-    isEmpty: () => !getMarkdown().trim(),
+    isEmpty: () => [...root.children].every(isEmptyBlock), // same answer as an empty getMarkdown(), without building it
     focus,
     caretToStart: () => { root.focus({ preventScroll: true }); const b = root.firstElementChild; if (b) caretToStart(b); },
     toggleType,

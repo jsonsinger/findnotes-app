@@ -117,6 +117,8 @@ h1, h2 {
 
 .who {
   grid-area: 1 / 1;
+  color: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -718,8 +720,7 @@ h1, h2 {
 .fmt-b { font-weight: 700; }
 .fmt-i { font-style: italic; font-family: Georgia, serif; font-size: 20px; }
 
-#item-title::placeholder,
-#item-body::placeholder {
+#item-title::placeholder {
   color: var(--text-muted);
 }
 
@@ -822,12 +823,7 @@ h1, h2 {
   padding: 8px 0 8px 16px;
 }
 
-/* Tapping the list name opens this: rename, pick an icon, or archive the list */
-.who {
-  color: inherit;
-  text-align: left;
-}
-
+/* Tapping the list name opens this: rename or pick an icon */
 .listedit {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 54px);
@@ -917,10 +913,6 @@ h1, h2 {
   margin: 6px 0;
   border: 0;
   border-top: 0.5px solid var(--line-strong);
-}
-
-.menu button.danger {
-  color: var(--danger);
 }
 
 .menu button:disabled {
