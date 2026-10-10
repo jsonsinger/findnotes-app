@@ -1,14 +1,16 @@
-// Find Notes service worker: keeps the app on the device so it opens with no connection.
+// FindNotes service worker: keeps the app on the device so it opens with no connection.
 //
 // Change VERSION whenever you change any file of the app (Settings shows it, by asking this
 // worker). Browsers notice that sw.js changed, fetch the new files into a fresh cache, and the
 // app offers an "Update" button. Notes themselves are in IndexedDB and are never touched here.
-const VERSION = '0.1.7';
+const VERSION = '0.1.8';
 const CACHE = `find-notes-${VERSION}`;
 
 const SHELL = [
   './',
   'index.html',
+  'welcome.html',
+  'gate.js',
   'styles.css',
   'app.js',
   'theme.js',
@@ -20,6 +22,8 @@ const SHELL = [
   'icon-512.png',
   'icon-maskable-512.png',
   'apple-touch-icon.png',
+  'fonts/caveat.woff2',
+  'fonts/karla.woff2',
 ];
 
 self.addEventListener('install', (event) => {

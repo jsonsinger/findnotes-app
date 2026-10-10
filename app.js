@@ -1910,9 +1910,9 @@ function disarmImport() {
 
 function readBackup(text) {
   let data;
-  try { data = JSON.parse(text); } catch { throw new Error("that isn't a Find Notes backup"); }
+  try { data = JSON.parse(text); } catch { throw new Error("that isn't a FindNotes backup"); }
   if (data?.app !== 'find-notes' || !Array.isArray(data.lists) || !Array.isArray(data.items)) {
-    throw new Error("that isn't a Find Notes backup");
+    throw new Error("that isn't a FindNotes backup");
   }
   // A file can be old, hand-edited or made to cause trouble, and whatever is imported is saved
   // for good. So copy across only the fields the app knows, each as the type it expects.
@@ -2051,7 +2051,7 @@ function setupOffline() {
 
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then((reg) => {
-    const offer = () => showBanner('A new version of Find Notes is ready.', 'Update', () => reg.waiting?.postMessage('skip-waiting'));
+    const offer = () => showBanner('A new version of FindNotes is ready.', 'Update', () => reg.waiting?.postMessage('skip-waiting'));
     if (reg.waiting && navigator.serviceWorker.controller) offer();
     reg.addEventListener('updatefound', () => {
       const worker = reg.installing;

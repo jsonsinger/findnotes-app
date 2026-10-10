@@ -1,6 +1,6 @@
 {
-  "name": "Find Notes",
-  "short_name": "Find Notes",
+  "name": "FindNotes",
+  "short_name": "FindNotes",
   "description": "Lists that can grow into notes. Everything stays on your device.",
   "id": "./",
   "start_url": "./",

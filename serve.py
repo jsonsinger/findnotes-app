@@ -1,4 +1,4 @@
-# Local test server for Find Notes. Run:  python serve.py
+# Local test server for FindNotes. Run:  python serve.py
 # Then open the address it prints on your phone (same Wi-Fi as this computer).
 # Unlike "python -m http.server", it tells the browser never to cache, so the phone
 # always gets your latest files instead of a mix of old and new ones.

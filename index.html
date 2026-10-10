@@ -4,8 +4,10 @@
   <meta charset="utf-8">
   <!-- Only this site's own files may load or run: no inline scripts, nothing from elsewhere. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <!-- First: a browser tab goes to the install page before anything is drawn (see gate.js). -->
+  <script src="gate.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Find Notes</title>
+  <title>FindNotes</title>
   <meta name="description" content="Lists that can grow into notes.">
   <meta name="color-scheme" content="dark">
   <script src="theme.js"></script>
@@ -15,7 +17,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Find Notes">
+  <meta name="apple-mobile-web-app-title" content="FindNotes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="styles.css">
   <!-- Fetch all the modules at once, instead of finding db.js and editor.js only after app.js has loaded -->
@@ -109,7 +111,7 @@
           <span class="tile">
             <svg class="icon" aria-hidden="true"><use id="tile-icon" href="#i-list"/></svg>
           </span>
-          <h1 id="title">Find Notes</h1>
+          <h1 id="title">FindNotes</h1>
         </button>
       </div>
       <button class="icon-btn" id="search-btn" aria-label="Search">

@@ -1,4 +1,4 @@
-// Storage layer for Find Notes: thin promise wrappers over IndexedDB.
+// Storage layer for FindNotes: thin promise wrappers over IndexedDB.
 const DB_NAME = 'find-notes';
 const DB_VERSION = 1;
 
