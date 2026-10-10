@@ -1276,24 +1276,51 @@ const MAX_DOTS = 5; // more lists than this: a window of five dots that follows 
 
 const currentIndex = () => state.lists.findIndex((l) => l.id === state.currentId);
 
+const DOT_W = 12; // px, the width of one .dot
+let dotsKey = ''; // which lists the dots were built for
+
 function renderDots() {
   const n = state.lists.length;
-  el.dots.hidden = n < 2; // one list needs no indicator
-  if (n < 2) return;
+  const hidden = n < 2; // one list needs no indicator
+  el.dots.hidden = hidden;
+  el.app.classList.toggle('has-dots', !hidden); // the strip under the add bar grows to cover them
+  if (hidden) return;
 
-  // Like the page dots on a phone home screen: five at a time, with the end dots shrunk
-  // when there are more lists beyond them.
+  // Every list has a dot on one long track, and the same dots stay put between renders, so
+  // moving to another list slides the track and resizes the dots instead of redrawing them.
+  const key = state.lists.map((l) => `${l.id}\n${l.name}`).join('\n');
+  if (key !== dotsKey) {
+    const first = !dotsKey;
+    dotsKey = key;
+    const track = document.createElement('div');
+    track.className = 'dots-track';
+    track.append(...state.lists.map((list) => {
+      const dot = document.createElement('button');
+      dot.className = 'dot';
+      dot.dataset.id = list.id;
+      dot.setAttribute('aria-label', list.name); // list.name is user text, so no innerHTML
+      return dot;
+    }));
+    el.dots.replaceChildren(track);
+    el.dots.style.width = `${Math.min(n, MAX_DOTS) * DOT_W}px`;
+    if (first) { // the first time they just appear
+      el.dots.classList.add('still');
+      requestAnimationFrame(() => requestAnimationFrame(() => el.dots.classList.remove('still')));
+    }
+  }
+
+  // Like the page dots on a phone home screen: a window of five that follows you along,
+  // with the end dots shrunk when there are more lists beyond them.
   const start = clamp(currentIndex() - Math.floor(MAX_DOTS / 2), 0, Math.max(0, n - MAX_DOTS));
-  const shown = state.lists.slice(start, start + MAX_DOTS);
-  el.dots.replaceChildren(...shown.map((list, i) => {
-    const dot = document.createElement('button');
-    dot.className = 'dot';
-    if ((i === 0 && start > 0) || (i === shown.length - 1 && start + MAX_DOTS < n)) dot.classList.add('edge');
-    dot.dataset.id = list.id;
-    dot.setAttribute('aria-label', list.name); // list.name is user text, so no innerHTML
-    if (list.id === state.currentId) dot.setAttribute('aria-current', 'true');
-    return dot;
-  }));
+  const end = Math.min(n, start + MAX_DOTS) - 1;
+  const track = el.dots.firstElementChild;
+  [...track.children].forEach((dot, i) => {
+    dot.classList.toggle('edge', (i === start && start > 0) || (i === end && end < n - 1));
+    dot.tabIndex = i >= start && i <= end ? 0 : -1; // the hidden ones can't be tabbed to
+    if (state.lists[i].id === state.currentId) dot.setAttribute('aria-current', 'true');
+    else dot.removeAttribute('aria-current');
+  });
+  track.style.transform = `translateX(${-start * DOT_W}px)`;
 }
 
 el.dots.addEventListener('click', (e) => {

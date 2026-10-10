@@ -21,6 +21,8 @@
   --warn-text: #ffb4aa;
   --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* How far the add bar sits above the bottom edge: close to the home bar, not floating high */
+  --bar-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.5 + 10px);
   color-scheme: dark;
 }
 
@@ -97,8 +99,8 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 8px 18px;
-  min-height: 56px;
+  padding: calc(env(safe-area-inset-top, 0px) + 22px) 14px 8px 18px;
+  min-height: 66px;
 }
 
 h1, h2 {
@@ -199,7 +201,30 @@ h1, h2 {
   overflow-y: auto;
   background: var(--bg);
   /* room to scroll the last item clear of the floating button */
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 110px);
+  padding-bottom: calc(var(--bar-bottom) + 110px);
+}
+
+/* With the dots the strip is taller, so there is more to scroll clear of */
+#app.has-dots .list {
+  padding-bottom: calc(var(--bar-bottom) + 150px);
+}
+
+/* A solid strip under the add bar and the dots, so list text never shows through or around
+   them. It fades in above, so rows slide out of sight rather than being cut off. */
+.stage::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--bar-bottom) + 56px + 14px + 20px);
+  background: linear-gradient(to top, var(--bg) calc(100% - 20px), transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+#app.has-dots .stage::after {
+  height: calc(var(--bar-bottom) + 56px + 14px + 44px + 20px);
 }
 
 /* A throwaway copy of a neighbouring list, only there during a swipe */
@@ -266,7 +291,7 @@ h1, h2 {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  bottom: var(--bar-bottom);
   height: 56px;
   border-radius: 28px;
   background: var(--bar-bg);
@@ -439,7 +464,7 @@ h1, h2 {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  bottom: var(--bar-bottom);
   height: 56px;
   padding: 0 6px 0 22px;
   display: flex;
@@ -604,7 +629,8 @@ h1, h2 {
 
 /* With the formatting bar showing there has to be room under the last line */
 .drawer.show-meta #item-body {
-  padding-bottom: 76px;
+  padding-bottom: 16px;
+  scroll-padding-bottom: 16px;
 }
 
 /* The blocks the editor builds: paragraph, heading, bullet, tick box */
@@ -678,21 +704,20 @@ h1, h2 {
   pointer-events: none;
 }
 
-/* The formatting bar: floats just above the keyboard once the note is full size */
+/* The formatting bar: sits under the note, just above the keyboard, once the note is full size.
+   It is part of the layout (not floating over the text), so the text you are typing always
+   stays above it. */
 .fmtbar {
   display: none;
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  flex: none;
   height: 52px;
+  margin-top: 6px;
   align-items: center;
   justify-content: space-around;
   padding: 0 6px;
   border-radius: 26px;
   background: var(--tile-bg);
   box-shadow: var(--shadow-popover);
-  z-index: 2;
 }
 
 .drawer.show-meta .fmtbar {
@@ -795,7 +820,7 @@ h1, h2 {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
+  bottom: calc(var(--bar-bottom) + 68px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -969,19 +994,26 @@ h1, h2 {
   color: var(--accent);
 }
 
-/* Dots: which list you are on, just above the add bar */
+/* Dots: which list you are on, just above the add bar. Every list has a dot on a long track;
+   the window of five slides along it, and the dots grow, shrink and fade as you move. */
 .dots {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
-  display: flex;
-  align-items: center;
+  bottom: calc(var(--bar-bottom) + 60px);
   height: 28px;
+  overflow: hidden;
   z-index: 3;
 }
 
+.dots-track {
+  display: flex;
+  height: 28px;
+  transition: transform 220ms ease-out;
+}
+
 .dot {
+  flex: none;
   width: 12px;
   height: 28px;
   display: grid;
@@ -995,6 +1027,7 @@ h1, h2 {
   border-radius: 50%;
   background: var(--text-muted);
   opacity: 0.5;
+  transition: width 220ms ease-out, height 220ms ease-out, opacity 220ms ease-out, background-color 220ms ease-out;
 }
 
 .dot[aria-current='true']::before {
@@ -1007,6 +1040,12 @@ h1, h2 {
 .dot.edge::before {
   width: 4px;
   height: 4px;
+}
+
+/* The first time they are drawn they just appear */
+.dots.still .dots-track,
+.dots.still .dot::before {
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
