@@ -1862,7 +1862,7 @@ const THEME_KEY = 'find-notes:theme';
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
   document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', theme === 'light' ? '#f4f3ee' : '#171716');
+    ?.setAttribute('content', theme === 'light' ? '#e8eae1' : '#171716');
 }
 
 function savedTheme() {
