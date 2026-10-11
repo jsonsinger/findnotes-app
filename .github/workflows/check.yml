@@ -1,0 +1,12 @@
+# Runs check.py on every push and pull request, so a file missing from sw.js or a
+# forgotten VERSION bump shows up as a red X before phones get a broken update.
+name: Offline check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python check.py --base "${{ github.event.pull_request.base.sha || github.event.before }}"
