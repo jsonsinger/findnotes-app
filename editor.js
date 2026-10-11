@@ -4,6 +4,7 @@
 //
 //   p     plain paragraph          text
 //   h     heading                  ## text
+//   h3    smaller heading          ### text
 //   li    bullet                   - text
 //   task  tick box                 - [ ] text   /   - [x] text
 //   inline: **bold** and *italic*   (a literal * or \ is written as \* and \\)
@@ -11,11 +12,13 @@
 /* ---------- Markdown <-> blocks (no DOM needed for the plain-text helpers) ---------- */
 
 const HEADING = /^#{1,6} (.*)$/;
+const HEADING3 = /^### (.*)$/;
 const TASK = /^[-*+] \[([ xX])\] (.*)$/;
 const BULLET = /^[-*+] (.*)$/;
 
 export function parseLine(line) {
   let m;
+  if ((m = HEADING3.exec(line))) return { type: 'h3', text: m[1] };
   if ((m = HEADING.exec(line))) return { type: 'h', text: m[1] };
   if ((m = TASK.exec(line))) return { type: 'task', done: m[1] !== ' ', text: m[2] };
   if ((m = BULLET.exec(line))) return { type: 'li', text: m[1] };
@@ -71,7 +74,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     if (type === 'task' && done) b.dataset.done = '1';
     return b;
   };
-  const typeOf = (b) => ['h', 'li', 'task'].find((t) => b.classList.contains(t)) || 'p';
+  const typeOf = (b) => ['h', 'h3', 'li', 'task'].find((t) => b.classList.contains(t)) || 'p';
   const setType = (b, type) => {
     b.className = `b ${type}`;
     delete b.dataset.done;
@@ -158,6 +161,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     const text = inlineText(b);
     switch (typeOf(b)) {
       case 'h': return `## ${text}`;
+      case 'h3': return `### ${text}`;
       case 'li': return `- ${text}`;
       case 'task': return `- [${b.dataset.done ? 'x' : ' '}] ${text}`;
       default: return /^(#{1,6} |[-+] )/.test(text) ? `\\${text}` : text;
@@ -285,7 +289,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     tail.setStart(r.startContainer, r.startOffset);
     tail.setEnd(block, block.childNodes.length);
     const rest = tail.extractContents();
-    const next = makeBlock(type === 'h' ? 'p' : type);
+    const next = makeBlock(type === 'h' || type === 'h3' ? 'p' : type);
     next.append(rest);
     tidy(block);
     tidy(next);
@@ -319,7 +323,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   });
 
   // Typing "- ", "* ", "# " or "[] " at the start of a line starts a bullet, heading or tick box.
-  const SHORTCUTS = { '-': 'li', '*': 'li', '#': 'h', '##': 'h', '###': 'h', '[]': 'task', '[ ]': 'task' };
+  const SHORTCUTS = { '-': 'li', '*': 'li', '#': 'h', '##': 'h', '###': 'h3', '[]': 'task', '[ ]': 'task' };
   function shortcut() {
     const sel = getSelection();
     if (!sel.rangeCount || !sel.isCollapsed) return;
@@ -426,8 +430,12 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   function state() {
     const blocks = selectedBlocks();
     const type = blocks.length && blocks.every((b) => typeOf(b) === typeOf(blocks[0])) ? typeOf(blocks[0]) : 'p';
-    let bold = false, italic = false;
-    try { bold = document.queryCommandState('bold'); italic = document.queryCommandState('italic'); } catch { /* not focused */ }
+    // Read bold and italic from the markup, not queryCommandState: Safari reports "bold" for
+    // any text drawn heavy, so every heading lit up the B button.
+    const at = getSelection().anchorNode;
+    const { bold, italic } = at && root.contains(at)
+      ? fmtOf(at.nodeType === 3 ? at : { parentNode: at })
+      : { bold: false, italic: false };
     return { type, bold, italic };
   }
 
