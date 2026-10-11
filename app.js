@@ -486,7 +486,7 @@ const fmtButtons = [...document.querySelectorAll('#fmtbar [data-cmd]')];
 function syncToolbar() {
   if (!drawer) return;
   const { type, bold, italic } = editor.state();
-  const on = { h: type === 'h', b: bold, i: italic, li: type === 'li', task: type === 'task' };
+  const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, li: type === 'li', task: type === 'task' };
   for (const b of fmtButtons) b.setAttribute('aria-pressed', String(!!on[b.dataset.cmd]));
 }
 for (const eventName of ['pointerdown', 'mousedown']) {
