@@ -634,16 +634,23 @@ h1, h2 {
 }
 
 /* The blocks the editor builds: paragraph, heading, bullet, tick box */
+/* Each line is a block, so the space between lines lives here: a little around every block,
+   more above a heading so it starts a new section (but not at the very top of the note). */
 #item-body .b {
   position: relative;
   min-height: 24px;
+  padding: 3px 0;
 }
 
 #item-body .b.h {
   font-size: 20px;
   font-weight: 600;
   line-height: 1.35;
-  padding: 8px 0 2px;
+  padding: 18px 0 4px;
+}
+
+#item-body .b.h:first-child {
+  padding-top: 4px;
 }
 
 #item-body .b.li,
@@ -655,7 +662,7 @@ h1, h2 {
   content: '';
   position: absolute;
   left: 11px;
-  top: 10px;
+  top: 13px; /* 10px into the line, below the block's padding */
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -666,7 +673,7 @@ h1, h2 {
   content: '';
   position: absolute;
   left: 3px;
-  top: 3px;
+  top: 6px;
   width: 18px;
   height: 18px;
   box-sizing: border-box;
@@ -683,7 +690,7 @@ h1, h2 {
   content: '';
   position: absolute;
   left: 9px;
-  top: 6px;
+  top: 9px;
   width: 4px;
   height: 8px;
   border: solid var(--on-accent);
@@ -805,7 +812,7 @@ h1, h2 {
   align-items: baseline;
   gap: 8px;
   justify-content: space-between;
-  margin: -8px 0 10px;
+  margin: -8px 0 16px;
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -835,7 +842,6 @@ h1, h2 {
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.2s, visibility 0s 0.2s;
-  z-index: 6;
 }
 
 .toast.show {

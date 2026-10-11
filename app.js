@@ -196,13 +196,14 @@ async function load() {
   state.archive.items = items.filter((i) => i.archivedAt).sort(newest);
 }
 
-// Sample data from the mockup, only used when the database is empty.
+// What a new install starts with, only used when the database is empty. Kept small, so it is
+// nearly a clean slate: one list to rename and give an icon, and a short guide. Bodies are
+// Markdown, as the editor saves them (see editor.js).
 async function seed() {
-  const home = { id: db.uid(), name: 'Home', icon: 'flame', order: 0 };
+  const home = { id: db.uid(), name: 'Start here', icon: 'star', order: 0 };
   const samples = [
-    ['Call the electrician', 'Ask about the kitchen socket'],
-    ['Buy lightbulbs', ''],
-    ['Fix the gate latch', 'Needs a new spring'],
+    ['Tap the circle to tick this off', 'Done with these two? Hold one down to pick it, then slide to archive.'],
+    ['Open me for a quick guide', '## Getting around\n- Swipe sideways to move between lists\n- Tap the list name to rename it or change its icon\n- *··· → New list* adds another list\n## Notes\nUse **bold**, *italic*, headings, bullets and tick boxes:\n- [ ] like this one\n## Keeping your notes safe\nEverything stays on this phone. *··· → Settings → Export a backup* saves a copy you can keep elsewhere.'],
   ];
   const now = Date.now();
   // One transaction, so a half-seeded database can't happen.
@@ -503,6 +504,7 @@ function setBookmark(on) {
   el.bookmark.setAttribute('aria-label', on ? 'Remove bookmark' : 'Bookmark');
 }
 
+const dateStamp = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 function showDrawer(mode, item) {
@@ -1904,7 +1906,9 @@ el.exportBtn.addEventListener('click', async () => {
   try {
     const [lists, items] = await Promise.all([db.getAll('lists'), db.getAll('items')]);
     const backup = { app: 'find-notes', format: 1, exportedAt: new Date().toISOString(), lists, items };
-    const name = `find-notes-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    // FindNotes-backup-2026-10-11.json (today, where you are): sorts by date, and a search for
+    // "FindNotes" in the file picker finds them all.
+    const name = `FindNotes-backup-${dateStamp(new Date())}.json`;
     const file = new File([JSON.stringify(backup, null, 2)], name, { type: 'application/json' });
 
     if (navigator.canShare?.({ files: [file] })) {

@@ -12,28 +12,116 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preload" href="fonts/caveat.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/karla.woff2" as="font" type="font/woff2" crossorigin>
-<style>@font-face{font-family:'Caveat';src:url(fonts/caveat.woff2) format('woff2');font-weight:400 700;font-style:normal;font-display:swap}
+<style>
+@font-face{font-family:'Caveat';src:url(fonts/caveat.woff2) format('woff2');font-weight:400 700;font-style:normal;font-display:swap}
 @font-face{font-family:'Karla';src:url(fonts/karla.woff2) format('woff2');font-weight:200 800;font-style:normal;font-display:swap}
 
-body{margin:0;font-family:'Karla',system-ui,sans-serif;color:#2b2a26;background:#efe9da}
-a{color:#2b2a26;text-decoration:none}
+/* Ink, paper and highlighter. Caveat (handwriting) for headings and the notes on the drawings,
+   Karla for anything you read in sentences. --muted is the darkest grey that still reads as
+   quiet; --faint is for decoration only (it is too light for text). */
+:root{--ink:#2b2a26;--soft:#4a4840;--muted:#5b584e;--faint:#8c897d;--paper:#efe9da;--card:#f5f0e2;--screen:#faf6ea;--hl:#f2c94c}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:'Karla',system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--ink);text-decoration:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button,a{-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+h1,h2,p{margin:0}
 .hand{font-family:'Caveat',cursive}
-.wob{border:2px solid #2b2a26;border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
-.hl{background:linear-gradient(transparent 52%,rgba(242,201,76,0.75) 52%,rgba(242,201,76,0.75) 92%,transparent 92%);padding:0 6px}
-.card{position:relative;box-sizing:border-box;background:#f5f0e2;border:2px solid #2b2a26;border-radius:28px 22px 30px 24px/24px 30px 22px 28px;padding:20px 18px}
-.num{flex:none;width:40px;height:40px;box-sizing:border-box;border:2px solid #2b2a26;border-radius:52% 48% 50% 50%/50% 52% 48% 50%;display:grid;place-items:center;font-family:'Caveat',cursive;font-size:28px;font-weight:700;line-height:1;background:#f2c94c}
+
+/* the paper texture behind everything */
+.paper{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.defs{position:absolute;width:0;height:0}
+main{position:relative;z-index:1;min-height:100vh}
+
+/* layout */
+.wrap{width:100%;max-width:390px;box-sizing:border-box;padding:24px 24px 0;margin:0 auto}
+.wrap.wide{max-width:1120px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand span{font-family:'Caveat',cursive;font-size:32px;font-weight:700;line-height:1}
+.title{margin-top:46px;font-family:'Caveat',cursive;font-size:54px;line-height:.98;font-weight:700}
+.hl{background:linear-gradient(transparent 52%,rgba(242,201,76,.75) 52%,rgba(242,201,76,.75) 92%,transparent 92%);padding:0 6px}
+.lede{margin-top:14px;font-size:18px;line-height:1.45;color:var(--soft)}
+.note{font-size:16px;line-height:1.45;color:var(--muted)}
+.center{text-align:center}
+
+/* the numbered steps and their drawings */
+.step{margin-top:38px}
 .st{display:flex;align-items:center;gap:14px;font-family:'Caveat',cursive;font-size:34px;font-weight:700;line-height:1}
+.num{flex:none;width:40px;height:40px;box-sizing:border-box;border:2px solid var(--ink);border-radius:52% 48% 50% 50%/50% 52% 48% 50%;display:grid;place-items:center;font-family:'Caveat',cursive;font-size:28px;font-weight:700;line-height:1;background:var(--hl)}
+.hint{margin:8px 0 0 54px}
+.card{position:relative;box-sizing:border-box;margin-top:16px;background:var(--card);border:2px solid var(--ink);border-radius:28px 22px 30px 24px/24px 30px 22px 28px;padding:20px 18px}
+.tilt-1{transform:rotate(-.5deg)}
+.tilt-2{transform:rotate(.6deg)}
+.tilt-3{transform:rotate(-.4deg)}
+.wob{border:2px solid var(--ink);border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
 .lab{position:absolute;font-family:'Caveat',cursive;font-weight:600;font-size:24px;line-height:1;white-space:nowrap}
 .ar{position:absolute;pointer-events:none}
-.tile{width:58px;height:58px;box-sizing:border-box;border:2px dashed #b9b3a1;border-radius:14px 12px 15px 11px}
 
-[hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%}
-button,a{-webkit-tap-highlight-color:transparent}
+/* step 1: a browser bar with the button to tap */
+.scene{position:relative;height:122px}
+.bar{position:absolute;left:0;right:0;top:66px;height:56px;box-sizing:border-box;border:2px solid var(--ink);border-radius:28px 24px 30px 22px/24px 30px 22px 28px;display:flex;justify-content:space-around;align-items:center;background:var(--screen)}
+.bar.url{height:52px;border-radius:26px 22px 28px 24px/24px 28px 22px 26px;justify-content:flex-start;gap:10px;padding:0 6px 0 14px}
+.url-text{flex:1;font-size:16px;color:var(--soft)}
+.dim{opacity:.55}
+.hot{width:44px;height:44px;box-sizing:border-box;border:2px solid var(--ink);border-radius:50%;background:var(--hl);display:grid;place-items:center}
+.hot.small{width:38px;height:38px}
+.lab-share{left:56%;top:0;transform:rotate(2deg)}
+.ar-share{left:50%;top:24px;width:84px;height:44px}
+.lab-dots{left:8%;top:0;transform:rotate(-2deg)}
+.ar-dots{left:62%;top:22px;width:84px;height:44px}
+
+/* step 2: the menu, with the right row highlighted */
+.menu{display:flex;flex-direction:column;gap:6px;padding-bottom:50px}
+.menu.short{padding-bottom:46px}
+.row{border:2px solid transparent;color:var(--faint);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:500;line-height:1}
+.row.on{background:var(--hl);border-color:var(--ink);color:var(--ink);font-weight:700}
+.lab-add{left:20px;bottom:14px;transform:rotate(-1.5deg)}
+.ar-add{left:62%;top:150px;width:80px;height:44px}
+.ar-install{left:64%;top:146px;width:80px;height:44px}
+
+/* step 3: a home screen with the new icon on it */
+.home{padding-bottom:42px}
+.grid{display:grid;grid-template-columns:repeat(4,58px);justify-content:space-between;row-gap:14px;align-items:start}
+.tile{width:58px;height:58px;box-sizing:border-box;border:2px dashed #b9b3a1;border-radius:14px 12px 15px 11px}
+.app{display:flex;flex-direction:column;align-items:center;gap:4px}
+.app .tile{border:2px solid var(--ink);background:var(--hl);display:grid;place-items:center}
+.app span{font-family:'Caveat',cursive;font-size:20px;line-height:1;font-weight:600}
+.lab-open{right:22px;bottom:12px;transform:rotate(-2deg)}
+
+/* Android: the one-tap button, and the heading over the steps by hand */
+.install-wrap{margin-top:30px;text-align:center}
+.install{display:inline-flex;align-items:center;gap:12px;min-height:64px;padding:0 38px;background:var(--hl);font-family:'Caveat',cursive;font-size:36px;font-weight:700;transform:rotate(-1deg)}
+.done{margin-top:26px;text-align:center}
+.done-title{font-family:'Caveat',cursive;font-size:34px;font-weight:700;line-height:1.05}
+.by-hand{margin-top:54px;text-align:center}
+.by-hand-title{font-family:'Caveat',cursive;font-size:30px;font-weight:700;line-height:1}
+
+/* the closing lines and footer */
+.installed{margin-top:30px}
+.after{margin-top:56px;text-align:center}
+.tagline{font-family:'Caveat',cursive;font-size:30px;font-weight:700;line-height:1.15}
+.after .note{margin-top:4px}
+.cross{margin-top:30px;text-align:center}
+.cross a{border-bottom:2px solid var(--faint)}
+.sep{margin:0 8px}
+.foot{width:100%;max-width:390px;box-sizing:border-box;padding:70px 24px 36px;margin:0 auto}
+.foot.wide{max-width:1120px}
+.dotline{display:block}
+.foot p{margin-top:20px;text-align:center;font-size:15px;color:var(--muted)}
+
+/* desktop */
+.hero{max-width:720px;margin:0 auto;padding:96px 0 0;text-align:center}
+.hero .title{margin-top:0;font-size:clamp(52px,7vw,84px)}
+.hero .lede{margin:24px auto 0;font-size:21px;max-width:560px}
+.addr{margin-top:34px;display:inline-flex;align-items:center;padding:10px 26px;background:var(--card);font-family:'Caveat',cursive;font-size:40px;font-weight:700;line-height:1;transform:rotate(-.8deg)}
+.after.wide{margin-top:120px}
+.after.wide .tagline{font-size:34px;line-height:1.1}
+.noscript{padding:40px 24px;font-size:18px;text-align:center}
 </style>
 </head>
 <body>
-<svg aria-hidden="true" style="position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0">
+<svg class="paper" aria-hidden="true">
   <defs>
     <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="4"/><feColorMatrix type="matrix" values="0 0 0 0 0.36  0 0 0 0 0.3  0 0 0 0 0.2  0.9 0 0 0 -0.28"/></filter>
     <filter id="blotch" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.006 0.01" numOctaves="2" seed="9"/><feColorMatrix type="matrix" values="0 0 0 0 0.62  0 0 0 0 0.52  0 0 0 0 0.32  0.5 0 0 0 -0.12"/></filter>
@@ -41,45 +129,158 @@ button,a{-webkit-tap-highlight-color:transparent}
   <rect width="100%" height="100%" filter="url(#blotch)" opacity="0.55"/>
   <rect width="100%" height="100%" filter="url(#grain)" opacity="0.5"/>
 </svg>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="rough" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="2" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="2.5"/></filter></defs></svg>
-<main style="position:relative;z-index:1;min-height:100vh">
-<section id="sec-ios" hidden><div style="width:100%;max-width:390px;box-sizing:border-box;padding:24px 24px 0;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg><span class="hand" style="font-size:32px;font-weight:700;line-height:1">FindNotes</span></div></div>
-      <h1 class="hand" style="margin:46px 0 0;font-size:54px;line-height:0.98;font-weight:700">Add it to your <span class="hl">home screen.</span></h1>
-      <p class="hand" style="margin:16px 0 0;font-size:27px;line-height:1.1;color:#4a4840">Open this page in Safari first. It is how iPhone installs things like this.</p>
-      <p class="hand" style="margin:10px 0 0;font-size:24px;line-height:1.1;color:#6e6a5e">Already installed? Open FindNotes from your home screen.</p>
-      <div style="margin-top:38px"><div class="st"><span class="num">1</span><span>Tap Share</span></div><div class="card" style="margin-top:16px;transform:rotate(-0.5deg)"><div style="position:relative;height:122px"><div class="lab" style="left:56%;top:0;transform:rotate(2deg)">tap Share</div><svg class="ar" style="left:50%;top:24px;width:84px;height:44px;" viewBox="0 0 100 44" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M96 8 C 66 4, 34 14, 8 30" vector-effect="non-scaling-stroke"/><path d="M8 30 L 11 17 M8 30 L 21 27" vector-effect="non-scaling-stroke"/></svg>
-<div style="position:absolute;left:0;right:0;top:66px;height:56px;box-sizing:border-box;border:2px solid #2b2a26;border-radius:28px 24px 30px 22px/24px 30px 22px 28px;display:flex;justify-content:space-around;align-items:center;background:#faf6ea">
-<span style="opacity:.55"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M15 5L8 12l7 7"/></svg></span><span style="opacity:.55"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M9 5l7 7-7 7"/></svg></span><span style="width:44px;height:44px;border:2px solid #2b2a26;border-radius:50%;background:#f2c94c;display:grid;place-items:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M12 15V4M8 8l4-4 4 4M6 11H5v9h14v-9h-1"/></svg></span><span><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M3 6c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1zM12 7v13"/></svg></span><span><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M8 8h11v11H8zM5 16V5h11"/></svg></span></div></div></div></div>
-      <div style="margin-top:38px"><div class="st"><span class="num">2</span><span>Add to Home Screen</span></div><div class="card" style="margin-top:16px;transform:rotate(0.6deg)"><div style="display:flex;flex-direction:column;gap:6px;padding-bottom:50px"><div style="border:2px solid transparent;color:#8c897d;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:500;line-height:1"><span>Copy</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M9 9h10v11H9zM5 15V4h10"/></svg></div><div style="border:2px solid transparent;color:#8c897d;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:500;line-height:1"><span>Add to Bookmarks</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M3 6c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1zM12 7v13"/></svg></div><div style="background:#f2c94c;border:2px solid #2b2a26;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:700;line-height:1"><span>Add to Home Screen</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM12 8v8M8 12h8"/></svg></div></div>
-<div class="lab" style="left:20px;bottom:14px;transform:rotate(-1.5deg)">then tap Add, top right</div><svg class="ar" style="left:62%;top:150px;width:80px;height:44px;" viewBox="0 0 100 44" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M96 36 C 66 40, 34 30, 8 14" vector-effect="non-scaling-stroke"/><path d="M8 14 L 11 27 M8 14 L 21 17" vector-effect="non-scaling-stroke"/></svg></div></div>
-      <div style="margin-top:38px"><div class="st"><span class="num">3</span><span>Open it from there</span></div><div class="card" style="margin-top:16px;transform:rotate(-0.4deg)"><div style="padding-bottom:42px"><div style="display:grid;grid-template-columns:repeat(4,58px);justify-content:space-between;row-gap:14px;align-items:start"><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div class="tile" style="border:2px solid #2b2a26;background:#f2c94c;display:grid;place-items:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg></div><span class="hand" style="font-size:20px;line-height:1;font-weight:600">FindNotes</span></div><div class="tile"></div></div></div><div class="lab" style="right:22px;bottom:12px;transform:rotate(-2deg)">tap to open</div></div></div>
-      <div style="margin-top:56px;text-align:center"><div class="hand" style="font-size:30px;font-weight:700;line-height:1.15">Free. Works offline.<br>No account.</div><div class="hand" style="margin-top:6px;font-size:26px;color:#6e6a5e">Notes stay on your device</div></div>
-<div class="hand" style="margin-top:34px;text-align:center;font-size:25px;color:#6e6a5e">On a different phone? <a href="#android" data-show="android" style="border-bottom:2px solid #8c897d">Android</a></div></div><div style="width:100%;max-width:390px;box-sizing:border-box;padding:70px 24px 36px;margin:0 auto"><svg viewBox="0 0 760 8" preserveAspectRatio="none" width="100%" height="8" fill="none" stroke="#8c897d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 9" aria-hidden="true" style="display:block"><path d="M2 4 C 60 1, 120 7, 190 4 S 320 1, 380 4 S 500 7, 570 4 S 700 1, 758 4" vector-effect="non-scaling-stroke"/></svg><div class="hand" style="margin-top:20px;text-align:center;font-size:24px;color:#6e6a5e">Made by Quirks<span style="margin:0 10px">&middot;</span>&copy; 2026</div></div></section><section id="sec-android" hidden><div style="width:100%;max-width:390px;box-sizing:border-box;padding:24px 24px 0;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg><span class="hand" style="font-size:32px;font-weight:700;line-height:1">FindNotes</span></div></div>
-      <h1 class="hand" style="margin:46px 0 0;font-size:54px;line-height:0.98;font-weight:700">Install <span class="hl">FindNotes.</span></h1>
-      <p class="hand" style="margin:16px 0 0;font-size:27px;line-height:1.1;color:#4a4840">It lands on your home screen, like any other app.</p>
-      <p class="hand" style="margin:10px 0 0;font-size:24px;line-height:1.1;color:#6e6a5e">Already installed? Open FindNotes from your home screen.</p>
-      <div style="margin-top:30px;text-align:center"><a href="#" id="install" hidden class="wob hand" style="display:inline-flex;align-items:center;gap:12px;min-height:64px;padding:0 38px;background:#f2c94c;font-size:36px;font-weight:700;transform:rotate(-1deg)">Install FindNotes</a></div>
-      <div id="done" hidden style="margin-top:26px;text-align:center"><div class="hand" style="font-size:34px;font-weight:700;line-height:1.05">Installed.</div><div class="hand" style="font-size:27px;color:#4a4840;margin-top:4px">Open FindNotes from your home screen.</div></div>
-      <div id="by-hand" style="margin-top:54px;text-align:center"><div class="hand" style="font-size:30px;font-weight:700;line-height:1">Install it from the menu</div><div class="hand" style="font-size:26px;color:#6e6a5e;margin-top:2px">Three quick steps.</div></div>
-      <div style="margin-top:38px"><div class="st"><span class="num">1</span><span>Open the menu</span></div><div class="card" style="margin-top:16px;transform:rotate(-0.5deg)"><div style="position:relative;height:122px"><div class="lab" style="left:8%;top:0;transform:rotate(-2deg)">tap the three dots</div><svg class="ar" style="left:62%;top:22px;width:84px;height:44px;" viewBox="0 0 100 44" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M96 8 C 66 4, 34 14, 8 30" vector-effect="non-scaling-stroke"/><path d="M8 30 L 11 17 M8 30 L 21 27" vector-effect="non-scaling-stroke"/></svg>
-<div style="position:absolute;left:0;right:0;top:66px;height:52px;box-sizing:border-box;border:2px solid #2b2a26;border-radius:26px 22px 28px 24px/24px 28px 22px 26px;display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;background:#faf6ea">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3"/></svg><span style="flex:1;font-family:'Karla',sans-serif;font-size:16px;color:#4a4840">app.findnotes.io</span><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M8 8h11v11H8zM5 16V5h11"/></svg></span><span style="width:38px;height:38px;border:2px solid #2b2a26;border-radius:50%;background:#f2c94c;display:grid;place-items:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" fill="#2b2a26"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg></span></div></div></div></div>
-      <div style="margin-top:38px"><div class="st"><span class="num">2</span><span>Install app</span></div><div class="card" style="margin-top:16px;transform:rotate(0.6deg)"><div style="display:flex;flex-direction:column;gap:6px;padding-bottom:46px"><div style="border:2px solid transparent;color:#8c897d;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:500;line-height:1"><span>New tab</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM12 8v8M8 12h8"/></svg></div><div style="border:2px solid transparent;color:#8c897d;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:500;line-height:1"><span>Bookmarks</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M3 6c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1zM12 7v13"/></svg></div><div style="background:#f2c94c;border:2px solid #2b2a26;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;height:44px;box-sizing:border-box;border-radius:14px 11px 15px 12px;font-family:'Caveat',cursive;font-size:27px;font-weight:700;line-height:1"><span>Install app</span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM12 8v8M8 12h8"/></svg></div></div>
-<div class="lab" style="left:20px;bottom:14px;transform:rotate(-1.5deg)">or Add to Home screen</div><svg class="ar" style="left:64%;top:146px;width:80px;height:44px;" viewBox="0 0 100 44" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M96 36 C 66 40, 34 30, 8 14" vector-effect="non-scaling-stroke"/><path d="M8 14 L 11 27 M8 14 L 21 17" vector-effect="non-scaling-stroke"/></svg></div></div>
-      <div style="margin-top:38px"><div class="st"><span class="num">3</span><span>Open it from there</span></div><div class="card" style="margin-top:16px;transform:rotate(-0.4deg)"><div style="padding-bottom:42px"><div style="display:grid;grid-template-columns:repeat(4,58px);justify-content:space-between;row-gap:14px;align-items:start"><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div class="tile" style="border:2px solid #2b2a26;background:#f2c94c;display:grid;place-items:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg></div><span class="hand" style="font-size:20px;line-height:1;font-weight:600">FindNotes</span></div><div class="tile"></div></div></div><div class="lab" style="right:22px;bottom:12px;transform:rotate(-2deg)">tap to open</div></div></div>
-      <div style="margin-top:56px;text-align:center"><div class="hand" style="font-size:30px;font-weight:700;line-height:1.15">Free. Works offline.<br>No account.</div><div class="hand" style="margin-top:6px;font-size:26px;color:#6e6a5e">Notes stay on your device</div></div>
-<div class="hand" style="margin-top:34px;text-align:center;font-size:25px;color:#6e6a5e">On a different phone? <a href="#ios" data-show="ios" style="border-bottom:2px solid #8c897d">iPhone</a></div></div><div style="width:100%;max-width:390px;box-sizing:border-box;padding:70px 24px 36px;margin:0 auto"><svg viewBox="0 0 760 8" preserveAspectRatio="none" width="100%" height="8" fill="none" stroke="#8c897d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 9" aria-hidden="true" style="display:block"><path d="M2 4 C 60 1, 120 7, 190 4 S 320 1, 380 4 S 500 7, 570 4 S 700 1, 758 4" vector-effect="non-scaling-stroke"/></svg><div class="hand" style="margin-top:20px;text-align:center;font-size:24px;color:#6e6a5e">Made by Quirks<span style="margin:0 10px">&middot;</span>&copy; 2026</div></div></section><section id="sec-desktop" hidden><div style="width:100%;max-width:1120px;box-sizing:border-box;padding:24px 24px 0;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2b2a26" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg><span class="hand" style="font-size:32px;font-weight:700;line-height:1">FindNotes</span></div></div>
-      <div style="max-width:720px;margin:0 auto;padding:96px 0 0;text-align:center">
-        <h1 class="hand" style="margin:0;font-size:clamp(52px,7vw,84px);line-height:0.98;font-weight:700">FindNotes is built for <span class="hl">phones.</span></h1>
-        <p class="hand" style="margin:24px auto 0;font-size:32px;line-height:1.12;color:#4a4840;max-width:560px">For the best experience, open this address on your phone and install it from there.</p>
-        <div class="wob hand" style="margin-top:34px;display:inline-flex;align-items:center;padding:10px 26px;background:#f5f0e2;font-size:40px;font-weight:700;line-height:1;transform:rotate(-0.8deg)">app.findnotes.io</div>
+<!-- Shared drawings: each icon is defined once and reused with <use> -->
+<svg class="defs" aria-hidden="true">
+  <defs><filter id="rough" x="-3%" y="-3%" width="106%" height="106%"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="2" result="t"/><feDisplacementMap in="SourceGraphic" in2="t" scale="2.5"/></filter></defs>
+  <symbol id="flame" viewBox="0 0 24 24"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="M15 5L8 12l7 7"/></symbol>
+  <symbol id="fwd" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M6 11H5v9h14v-9h-1"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24"><path d="M3 6c3-1 6-1 9 1 3-2 6-2 9-1v13c-3-1-6-1-9 1-3-2-6-2-9-1zM12 7v13"/></symbol>
+  <symbol id="tabs" viewBox="0 0 24 24"><path d="M8 8h11v11H8zM5 16V5h11"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><path d="M9 9h10v11H9zM5 15V4h10"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM12 8v8M8 12h8"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3"/></symbol>
+  <symbol id="dots" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></symbol>
+  <symbol id="arrow-up" viewBox="0 0 100 44" preserveAspectRatio="none"><path d="M96 8 C 66 4, 34 14, 8 30" vector-effect="non-scaling-stroke"/><path d="M8 30 L 11 17 M8 30 L 21 27" vector-effect="non-scaling-stroke"/></symbol>
+  <symbol id="arrow-down" viewBox="0 0 100 44" preserveAspectRatio="none"><path d="M96 36 C 66 40, 34 30, 8 14" vector-effect="non-scaling-stroke"/><path d="M8 14 L 11 27 M8 14 L 21 17" vector-effect="non-scaling-stroke"/></symbol>
+  <symbol id="dotline" viewBox="0 0 760 8" preserveAspectRatio="none"><path d="M2 4 C 60 1, 120 7, 190 4 S 320 1, 380 4 S 500 7, 570 4 S 700 1, 758 4" vector-effect="non-scaling-stroke"/></symbol>
+</svg>
+<main>
+
+<section id="sec-ios" hidden>
+  <div class="wrap">
+    <div class="brand"><svg width="30" height="30" fill="none" stroke="#2b2a26" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><use href="#flame"/></svg><span>FindNotes</span></div>
+    <h1 class="title">Add it to your <span class="hl">home screen.</span></h1>
+    <p class="lede">Three taps and it sits on your home screen like any other app. Best in Safari.</p>
+
+    <div class="step">
+      <h2 class="st"><span class="num">1</span><span>Tap Share</span></h2>
+      <p class="note hint">On newer iPhones, tap ··· first, then Share.</p>
+      <div class="card tilt-1" aria-hidden="true"><div class="scene">
+        <div class="lab lab-share">tap Share</div>
+        <svg class="ar ar-share" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#arrow-up"/></svg>
+        <div class="bar">
+          <span class="dim"><svg width="26" height="26" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#back"/></svg></span>
+          <span class="dim"><svg width="26" height="26" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#fwd"/></svg></span>
+          <span class="hot"><svg width="24" height="24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#share"/></svg></span>
+          <span><svg width="26" height="26" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#book"/></svg></span>
+          <span><svg width="26" height="26" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#tabs"/></svg></span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="step">
+      <h2 class="st"><span class="num">2</span><span>Add to Home Screen</span></h2>
+      <div class="card tilt-2" aria-hidden="true">
+        <div class="menu">
+          <div class="row"><span>Copy</span><svg width="24" height="24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#copy"/></svg></div>
+          <div class="row"><span>Add to Bookmarks</span><svg width="24" height="24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#book"/></svg></div>
+          <div class="row on"><span>Add to Home Screen</span><svg width="24" height="24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#plus"/></svg></div>
+        </div>
+        <div class="lab lab-add">then tap Add, top right</div>
+        <svg class="ar ar-add" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#arrow-down"/></svg>
       </div>
-      <div style="margin-top:120px;text-align:center"><div class="hand" style="font-size:34px;font-weight:700;line-height:1.1">Free. Works offline. No account.</div><div class="hand" style="margin-top:4px;font-size:28px;color:#6e6a5e">Notes stay on your device</div></div>
-<div class="hand" style="margin-top:34px;text-align:center;font-size:25px;color:#6e6a5e">Want the steps? <a href="#ios" data-show="ios" style="border-bottom:2px solid #8c897d">iPhone</a> <span style="margin:0 8px">&middot;</span> <a href="#android" data-show="android" style="border-bottom:2px solid #8c897d">Android</a></div></div><div style="width:100%;max-width:1120px;box-sizing:border-box;padding:70px 24px 36px;margin:0 auto"><svg viewBox="0 0 760 8" preserveAspectRatio="none" width="100%" height="8" fill="none" stroke="#8c897d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 9" aria-hidden="true" style="display:block"><path d="M2 4 C 60 1, 120 7, 190 4 S 320 1, 380 4 S 500 7, 570 4 S 700 1, 758 4" vector-effect="non-scaling-stroke"/></svg><div class="hand" style="margin-top:20px;text-align:center;font-size:24px;color:#6e6a5e">Made by Quirks<span style="margin:0 10px">&middot;</span>&copy; 2026</div></div></section>
-<noscript><div class="hand" style="padding:40px 24px;font-size:30px;text-align:center">FindNotes needs JavaScript. Open this page on your phone and add it to your home screen.</div></noscript>
+    </div>
+
+    <div class="step">
+      <h2 class="st"><span class="num">3</span><span>Open it from there</span></h2>
+      <div class="card tilt-3" aria-hidden="true">
+        <div class="home"><div class="grid">
+          <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+          <div class="app"><div class="tile"><svg width="30" height="30" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" filter="url(#rough)"><use href="#flame"/></svg></div><span>FindNotes</span></div>
+          <div class="tile"></div>
+        </div></div>
+        <div class="lab lab-open">tap to open</div>
+      </div>
+    </div>
+
+    <p class="note center installed">Already installed? Open FindNotes from your home screen.</p>
+    <div class="after"><p class="tagline">Free. Works offline.<br>No account.</p><p class="note">Notes stay on your device</p></div>
+    <p class="note cross">On a different phone? <a href="#android" data-show="android">Android</a></p>
+  </div>
+  <footer class="foot">
+    <svg class="dotline" preserveAspectRatio="none" width="100%" height="8" fill="none" stroke="#8c897d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 9" aria-hidden="true"><use href="#dotline"/></svg>
+    <p>Made by Quirks<span class="sep">&middot;</span>&copy; 2026</p>
+  </footer>
+</section>
+
+<section id="sec-android" hidden>
+  <div class="wrap">
+    <div class="brand"><svg width="30" height="30" fill="none" stroke="#2b2a26" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><use href="#flame"/></svg><span>FindNotes</span></div>
+    <h1 class="title">Install <span class="hl">FindNotes.</span></h1>
+    <p class="lede">It lands on your home screen, like any other app.</p>
+    <div class="install-wrap"><button type="button" id="install" class="wob install" hidden>Install FindNotes</button></div>
+    <div id="done" class="done" hidden><p class="done-title">Installed.</p><p class="lede">Open FindNotes from your home screen.</p></div>
+    <div id="by-hand" class="by-hand"><h2 class="by-hand-title">Install it from the menu</h2><p class="note">Three quick steps.</p></div>
+
+    <div class="step">
+      <h2 class="st"><span class="num">1</span><span>Open the menu</span></h2>
+      <div class="card tilt-1" aria-hidden="true"><div class="scene">
+        <div class="lab lab-dots">tap the three dots</div>
+        <svg class="ar ar-dots" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#arrow-up"/></svg>
+        <div class="bar url">
+          <svg width="20" height="20" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#lock"/></svg>
+          <span class="url-text">app.findnotes.io</span>
+          <span><svg width="24" height="24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#tabs"/></svg></span>
+          <span class="hot small"><svg width="22" height="22" fill="#2b2a26"><use href="#dots"/></svg></span>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="step">
+      <h2 class="st"><span class="num">2</span><span>Install app</span></h2>
+      <div class="card tilt-2" aria-hidden="true">
+        <div class="menu short">
+          <div class="row"><span>New tab</span><svg width="24" height="24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#plus"/></svg></div>
+          <div class="row"><span>Bookmarks</span><svg width="24" height="24" fill="none" stroke="#8c897d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#book"/></svg></div>
+          <div class="row on"><span>Install app</span><svg width="24" height="24" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><use href="#plus"/></svg></div>
+        </div>
+        <div class="lab lab-add">or Add to Home screen</div>
+        <svg class="ar ar-install" preserveAspectRatio="none" fill="none" stroke="#2b2a26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#arrow-down"/></svg>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2 class="st"><span class="num">3</span><span>Open it from there</span></h2>
+      <div class="card tilt-3" aria-hidden="true">
+        <div class="home"><div class="grid">
+          <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+          <div class="app"><div class="tile"><svg width="30" height="30" fill="none" stroke="#2b2a26" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" filter="url(#rough)"><use href="#flame"/></svg></div><span>FindNotes</span></div>
+          <div class="tile"></div>
+        </div></div>
+        <div class="lab lab-open">tap to open</div>
+      </div>
+    </div>
+
+    <p class="note center installed">Already installed? Open FindNotes from your home screen.</p>
+    <div class="after"><p class="tagline">Free. Works offline.<br>No account.</p><p class="note">Notes stay on your device</p></div>
+    <p class="note cross">On a different phone? <a href="#ios" data-show="ios">iPhone</a></p>
+  </div>
+  <footer class="foot">
+    <svg class="dotline" preserveAspectRatio="none" width="100%" height="8" fill="none" stroke="#8c897d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 9" aria-hidden="true"><use href="#dotline"/></svg>
+    <p>Made by Quirks<span class="sep">&middot;</span>&copy; 2026</p>
+  </footer>
+</section>
+
+<section id="sec-desktop" hidden>
+  <div class="wrap wide">
+    <div class="brand"><svg width="30" height="30" fill="none" stroke="#2b2a26" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" filter="url(#rough)"><use href="#flame"/></svg><span>FindNotes</span></div>
+    <div class="hero">
+      <h1 class="title">FindNotes is built for <span class="hl">phones.</span></h1>
+      <p class="lede">For the best experience, open this address on your phone and install it from there.</p>
+      <div class="wob addr">app.findnotes.io</div>
+    </div>
+    <div class="after wide"><p class="tagline">Free. Works offline. No account.</p><p class="note">Notes stay on your device</p></div>
+    <p class="note cross">Want the steps? <a href="#ios" data-show="ios">iPhone</a><span class="sep">&middot;</span><a href="#android" data-show="android">Android</a></p>
+  </div>
+  <footer class="foot wide">
+    <svg class="dotline" preserveAspectRatio="none" width="100%" height="8" fill="none" stroke="#8c897d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 9" aria-hidden="true"><use href="#dotline"/></svg>
+    <p>Made by Quirks<span class="sep">&middot;</span>&copy; 2026</p>
+  </footer>
+</section>
+
+<noscript><p class="noscript">FindNotes needs JavaScript. Open this page on your phone and add it to your home screen.</p></noscript>
 </main>
 <script>
 (function () {
@@ -113,8 +314,7 @@ button,a{-webkit-tap-highlight-color:transparent}
   var deferred = null, btn = document.getElementById('install'), done = document.getElementById('done');
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; btn.hidden = false; });
   window.addEventListener('appinstalled', function () { deferred = null; done.hidden = false; btn.hidden = true; });
-  btn.addEventListener('click', function (e) {
-    e.preventDefault();
+  btn.addEventListener('click', function () {
     if (!deferred) return;
     deferred.prompt();
     deferred.userChoice.then(function () { deferred = null; });
