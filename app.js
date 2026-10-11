@@ -64,6 +64,10 @@ const el = {
   version: $('version'),
   backupStatus: $('backup-status'),
   persistStatus: $('persist-status'),
+  resetBtn: $('reset-btn'),
+  resetbar: $('resetbar'),
+  resetbarHint: $('resetbar-hint'),
+  resetbarX: $('resetbar-x'),
   exportBtn: $('export-btn'),
   importBtn: $('import-btn'),
   importFile: $('import-file'),
@@ -676,6 +680,7 @@ const LAYERS = [
   { open: () => !el.menu.hidden, close: () => closeMenu() },
   { open: () => !el.listEdit.hidden, close: () => finishRename(false) },
   { open: () => !el.search.hidden, close: () => closeSearch() },
+  { open: () => !el.resetbar.hidden, close: () => closeResetBar() },
   { open: () => !el.settings.hidden, close: () => closeSettings() },
   { open: () => !el.archive.hidden, close: () => closeArchive() },
   { open: () => !el.allLists.hidden, close: () => closeAll() },
@@ -1885,10 +1890,15 @@ el.themeSeg.addEventListener('click', (e) => {
 });
 
 // The version lives only in sw.js, so ask the worker running this page. No worker
-// (local testing, or a browser without them) means you are looking at the files as they are.
+// (local testing, or a browser without them) means the files come straight from the server,
+// so read VERSION from the sw.js there.
 function appVersion() {
   const worker = navigator.serviceWorker?.controller;
-  if (!worker) return Promise.resolve('dev');
+  if (!worker) {
+    return fetch('sw.js', { cache: 'no-store' })
+      .then((r) => r.text())
+      .then((text) => /const VERSION = '([^']+)'/.exec(text)?.[1] ?? 'Unknown', () => 'Unknown');
+  }
   return new Promise((resolve) => {
     const channel = new MessageChannel();
     channel.port1.onmessage = (e) => resolve(String(e.data));
@@ -1913,16 +1923,52 @@ function openSettings() {
   el.backupStatus.textContent = '';
   const ask = navigator.storage?.persisted?.();
   (ask ?? Promise.resolve(persisted)).then((ok) => {
-    el.persistStatus.textContent = ok ? 'Protected' : 'Can be cleared by the browser';
-  }, () => { el.persistStatus.textContent = 'Unknown'; });
+    el.persistStatus.textContent = memoryOnly ? 'Not working' : ok ? 'Protected' : 'Can be cleared by the browser';
+  }, () => { el.persistStatus.textContent = memoryOnly ? 'Not working' : 'Unknown'; });
   showScreen(el.settings, el.settingsBack);
 }
 
 function closeSettings() {
   disarmImport();
+  closeResetBar();
   hideScreen(el.settings);
 }
 el.settingsBack.addEventListener('click', closeSettings);
+
+// Reset storage: deletes the database and starts afresh. Everything goes, so it takes two
+// slides, the second one after the bar has said plainly what will happen.
+let resetArmed = false;
+function openResetBar() {
+  resetArmed = false;
+  el.resetbar.classList.remove('final');
+  el.resetbarHint.textContent = 'Delete everything';
+  el.resetbar.hidden = false;
+}
+function closeResetBar() {
+  el.resetbar.hidden = true;
+  resetArmed = false;
+}
+el.resetBtn.addEventListener('click', openResetBar);
+el.resetbarX.addEventListener('click', closeResetBar);
+makeSlider(el.resetbar, async () => {
+  if (!resetArmed) {
+    resetArmed = true;
+    el.resetbar.classList.add('final');
+    el.resetbarHint.textContent = 'Again. No undo';
+    return;
+  }
+  closeResetBar();
+  try {
+    await db.resetDB();
+    // The unsaved draft and the last list opened go too. The theme stays.
+    try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(LAST_LIST_KEY); } catch { /* storage blocked */ }
+  } catch (error) {
+    console.error(error);
+    showToast("Couldn't reset. Close FindNotes everywhere and try again.");
+    return;
+  }
+  location.reload(); // opens like the first time, with the starter list
+});
 
 const say = (text) => { el.backupStatus.textContent = text; };
 
@@ -2144,11 +2190,8 @@ async function init() {
     state.lists = [{ id: db.uid(), name: 'Home', icon: 'flame', order: 0 }];
     state.items = [];
     state.archive = { lists: [], items: [] };
-    showBanner(
-      "Can't store notes on this device right now. Anything you add will be lost when you close the app.",
-      'Try again',
-      () => location.reload(),
-    );
+    // A toast, not a banner that can't be closed: Settings > Storage says so too, and can reset it.
+    showToast("Can't save notes on this device. Settings > Storage can reset it.", null, 8000);
   }
 
   const remembered = recallList();

@@ -279,6 +279,19 @@
        <h3 class="arch-heading">About</h3>
        <div class="setting"><span>Version</span><span class="setting-value" id="version"></span></div>
        <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
+       <p class="setting-note">If notes stop saving, resetting starts this device afresh. It deletes every list and note here, so export a backup first if you can.</p>
+       <div class="setting"><button class="setting-btn danger" id="reset-btn">Reset storage</button></div>
+     </div>
+     <div class="selbar" id="resetbar" hidden>
+       <div class="sel-fill"></div>
+       <span class="sel-hint" id="resetbar-hint"></span>
+       <button class="sel-knob" aria-label="Delete every list and note">
+         <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+         <span class="sel-label">Reset</span>
+       </button>
+       <button class="sel-x" id="resetbar-x" aria-label="Cancel">
+         <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+       </button>
      </div>
    </section>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

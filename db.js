@@ -81,6 +81,21 @@ export function batch({ put: puts = [], remove: removes = [] }) {
   });
 }
 
+// Deletes the whole database, every list and note. The app reloads afterwards and starts fresh.
+export async function resetDB() {
+  const open = dbPromise;
+  dbPromise = undefined;
+  if (open) {
+    try { (await open).close(); } catch { /* it never opened, which may be why we're here */ }
+  }
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('FindNotes is still open somewhere else'));
+  });
+}
+
 export const uid = () =>
   globalThis.crypto?.randomUUID
     ? crypto.randomUUID()
