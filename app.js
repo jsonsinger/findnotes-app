@@ -798,11 +798,36 @@ function fitViewport(settled) {
     // A full-page sheet stays full-page, just above the keyboard instead of behind it.
     const wasFull = lastFull > PEEK && sheetH >= lastFull - 2;
     const target = wasFull ? full : Math.min(sheetH, full);
-    if (keyboard !== view.keyboard) animateSheet(target); // glide as the keyboard comes or goes
+    if (keyboard !== view.keyboard) animateSheet(target).then(revealCaret); // glide as the keyboard comes or goes
     else setSheet(target);
   }
   lastFull = full;
   view = { keyboard, height, top };
+  revealCaret();
+}
+
+// The browser scrolls a tapped line into view while the description is still full height,
+// then the keyboard shrinks the sheet and the line ends up hidden behind it. So once the
+// sheet has its new size, scroll the description until the caret is showing again.
+const CARET_MARGIN = 24; // keep a line of breathing room below the caret
+let revealFrame = 0;
+function revealCaret() {
+  cancelAnimationFrame(revealFrame);
+  revealFrame = requestAnimationFrame(() => {
+    if (!drawer || document.activeElement !== el.itemBody) return;
+    const sel = getSelection();
+    if (!sel.rangeCount || !el.itemBody.contains(sel.focusNode)) return;
+    const range = sel.getRangeAt(0).cloneRange();
+    range.collapse(false);
+    let rect = range.getBoundingClientRect();
+    if (!rect.height) { // an empty line has no box of its own, so use its block's
+      const node = sel.focusNode.nodeType === 1 ? sel.focusNode : sel.focusNode.parentElement;
+      rect = (node.closest('.b') || node).getBoundingClientRect();
+    }
+    const box = el.itemBody.getBoundingClientRect();
+    if (rect.bottom > box.bottom - CARET_MARGIN) el.itemBody.scrollTop += rect.bottom - box.bottom + CARET_MARGIN;
+    else if (rect.top < box.top) el.itemBody.scrollTop -= box.top - rect.top;
+  });
 }
 
 // iPhones don't always announce every change in the visible area (moving between fields is
