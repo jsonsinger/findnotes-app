@@ -4,7 +4,7 @@
 // worker); `python check.py` tells you when it's due and `--fix` bumps it. Browsers notice
 // that sw.js changed, fetch the new files into a fresh cache, and the app offers an "Update"
 // button. Notes themselves are in IndexedDB and are never touched here.
-const VERSION = '0.1.12';
+const VERSION = '0.1.13';
 const CACHE = `find-notes-${VERSION}`;
 
 const SHELL = [
@@ -23,8 +23,20 @@ const SHELL = [
   'icon-512.png',
   'icon-maskable-512.png',
   'apple-touch-icon.png',
-  'fonts/caveat.woff2',
-  'fonts/karla.woff2',
+  'splash/launch-1125x2436.png',
+  'splash/launch-1170x2532.png',
+  'splash/launch-1179x2556.png',
+  'splash/launch-1206x2622.png',
+  'splash/launch-1242x2208.png',
+  'splash/launch-1242x2688.png',
+  'splash/launch-1260x2736.png',
+  'splash/launch-1284x2778.png',
+  'splash/launch-1290x2796.png',
+  'splash/launch-1320x2868.png',
+  'splash/launch-750x1334.png',
+  'splash/launch-828x1792.png',
+  'fonts/BricolageGrotesque.ttf',
+  'fonts/Urbanist.ttf',
 ];
 
 self.addEventListener('install', (event) => {
