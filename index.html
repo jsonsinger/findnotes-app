@@ -116,6 +116,21 @@
     <symbol id="i-heart" viewBox="0 0 24 24">
       <path d="M12 20s-7.5-4.6-7.5-10A4.5 4.5 0 0 1 12 7.5 4.5 4.5 0 0 1 19.5 10C19.5 15.4 12 20 12 20z"/>
     </symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24">
+      <path d="M15 4.5l4.5 4.5L8.5 20H4v-4.5zM13 6.5l4.5 4.5"/>
+    </symbol>
+    <symbol id="i-archive-in" viewBox="0 0 24 24">
+      <path d="M3.5 4h17v4h-17zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M12 11v6M9.5 14.5L12 17l2.5-2.5"/>
+    </symbol>
+    <symbol id="i-history" viewBox="0 0 24 24">
+      <path d="M3 12a9 9 0 1 0 2.6-6.4L3 8M3 3v5h5M12 7.5V12l3 2"/>
+    </symbol>
+    <symbol id="i-box" viewBox="0 0 24 24">
+      <path d="M3.5 4h17v4h-17zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>
+    </symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24">
+      <path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/>
+    </symbol>
   </svg>
 
   <div id="app">
@@ -209,13 +224,13 @@
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
    <div class="menu" id="menu" hidden>
-     <button data-action="all">All lists</button>
-     <button data-action="new">New list</button>
-     <button data-action="edit">Edit list</button>
+     <button data-action="all"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg>All lists</button>
+     <button data-action="new"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New list</button>
+     <button data-action="edit"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg>Edit list</button>
      <hr>
-     <button data-action="archive-this" id="menu-archive-this">Archive this list</button>
-     <button data-action="archive">Archive</button>
-     <button data-action="settings">Settings</button>
+     <button data-action="archive-this" id="menu-archive-this"><svg class="icon" aria-hidden="true"><use href="#i-archive-in"/></svg>Archive this list</button>
+     <button data-action="archive"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg>View archive</button>
+     <button data-action="settings"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>Settings</button>
    </div>
 
    <div class="menu-scrim" id="edit-scrim" hidden></div>
@@ -244,6 +259,35 @@
        <h2>Archive</h2>
      </header>
      <div class="screen-body" id="archive-body"></div>
+     <div class="archbar" id="archbar" data-mode="idle">
+       <p class="arch-hint" id="arch-hint">Press and hold to pick several</p>
+       <div class="arch-pick">
+         <button class="arch-btn" id="arch-restore"><svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg><span></span></button>
+         <button class="arch-btn danger" id="arch-delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg><span></span></button>
+       </div>
+       <div class="selbar" id="restorebar">
+         <div class="sel-fill"></div>
+         <span class="sel-hint" id="restorebar-hint"></span>
+         <button class="sel-knob" id="restorebar-knob" aria-label="Restore">
+           <svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg>
+           <span class="sel-label">Restore</span>
+         </button>
+         <button class="sel-x" id="restorebar-x" aria-label="Cancel">
+           <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+         </button>
+       </div>
+       <div class="selbar danger" id="deletebar">
+         <div class="sel-fill"></div>
+         <span class="sel-hint" id="deletebar-hint"></span>
+         <button class="sel-knob" id="deletebar-knob" aria-label="Delete for good">
+           <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+           <span class="sel-label">Delete</span>
+         </button>
+         <button class="sel-x" id="deletebar-x" aria-label="Cancel">
+           <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+         </button>
+       </div>
+     </div>
    </section>
    <section class="screen" id="search" role="dialog" aria-modal="true" aria-label="Search" hidden>
      <header class="header">
@@ -272,22 +316,38 @@
          </div>
        </div>
        <div class="setting">
-         <span class="setting-label" id="icons-label">Show icons<small>Next to each list</small></span>
+         <span class="setting-label" id="icons-label">Show icons<small>Next to lists and menu items</small></span>
          <button class="switch" id="icons-switch" role="switch" aria-checked="true" aria-labelledby="icons-label"></button>
        </div>
-       <h3 class="arch-heading">Backup</h3>
+       <h3 class="arch-heading">Your data</h3>
        <p class="setting-note">Your notes live only on this device. A backup is a file you can keep somewhere safe and bring back later. Save it to Files or Drive, in a folder called FindNotes, so it is easy to find.</p>
        <div class="setting"><button class="setting-btn" id="export-btn">Export a backup</button></div>
        <div class="setting"><button class="setting-btn" id="import-btn">Restore from a backup</button></div>
        <input type="file" id="import-file" accept="application/json,.json" hidden>
        <p class="setting-note" id="backup-status" role="status"></p>
+       <div class="setting">
+         <span class="setting-label" id="cleanup-label">Auto clean-up<small>Delete after <input class="days" id="cleanup-days" type="number" inputmode="numeric" min="1" max="999" value="30" aria-label="Days in the archive before deleting"> days in the archive</small></span>
+         <button class="switch" id="cleanup-switch" role="switch" aria-checked="false" aria-labelledby="cleanup-label"></button>
+       </div>
        <h3 class="arch-heading">About</h3>
+       <div class="setting"><span>Your notes</span><span class="setting-value" id="counts"></span></div>
        <div class="setting"><span>Version</span><span class="setting-value" id="version"></span></div>
        <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
        <p class="setting-note">If notes stop saving, resetting starts this device afresh. It deletes every list and note here, so export a backup first if you can.</p>
        <div class="setting"><button class="setting-btn danger" id="reset-btn">Reset storage</button></div>
      </div>
-     <div class="selbar" id="resetbar" hidden>
+     <div class="selbar danger" id="cleanupbar" hidden>
+       <div class="sel-fill"></div>
+       <span class="sel-hint" id="cleanupbar-hint"></span>
+       <button class="sel-knob" aria-label="Turn on auto clean-up">
+         <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+         <span class="sel-label">Turn on</span>
+       </button>
+       <button class="sel-x" id="cleanupbar-x" aria-label="Cancel">
+         <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+       </button>
+     </div>
+     <div class="selbar danger" id="resetbar" hidden>
        <div class="sel-fill"></div>
        <span class="sel-hint" id="resetbar-hint"></span>
        <button class="sel-knob" aria-label="Delete every list and note">
@@ -323,10 +383,10 @@
   </template>
   <template id="tpl-arch-row">
     <div class="arch-row">
+      <span class="circle" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
       <span class="tile small"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></span>
       <span class="arch-text"><span class="arch-name"></span><span class="arch-sub"></span></span>
       <button class="icon-btn" data-act="restore"><svg class="icon" aria-hidden="true"><use href="#i-restore"/></svg></button>
-      <button class="icon-btn" data-act="delete"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
     </div>
   </template>
   <template id="tpl-search-row">
