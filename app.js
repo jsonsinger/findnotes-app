@@ -13,6 +13,9 @@ const el = {
   listEdit: $('listedit'),
   editScrim: $('edit-scrim'),
   iconGrid: $('icon-grid'),
+  listEditTitle: $('listedit-title'),
+  listEditCancel: $('listedit-cancel'),
+  listEditSave: $('listedit-save'),
   listbar: $('listbar'),
   listbarHint: $('listbar-hint'),
   listbarX: $('listbar-x'),
@@ -39,6 +42,7 @@ const el = {
   menu: $('menu'),
   allLists: $('all-lists'),
   allRows: $('all-rows'),
+  allCount: $('all-count'),
   allNew: $('all-new'),
   archive: $('archive'),
   archiveBody: $('archive-body'),
@@ -71,6 +75,8 @@ const el = {
   fmtbar: $('fmtbar'),
   themeSeg: $('theme-seg'),
   iconsSwitch: $('icons-switch'),
+  sketchSwitch: $('sketch-switch'),
+  themeNote: $('theme-note'),
   version: $('version'),
   counts: $('counts'),
   cleanupSwitch: $('cleanup-switch'),
@@ -521,8 +527,8 @@ function updateTrash() {
 const fmtButtons = [...document.querySelectorAll('#fmtbar [data-cmd]')];
 function syncToolbar() {
   if (!drawer) return;
-  const { type, bold, italic } = editor.state();
-  const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, li: type === 'li', task: type === 'task' };
+  const { type, bold, italic, mark } = editor.state();
+  const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, m: mark, li: type === 'li', task: type === 'task' };
   for (const b of fmtButtons) b.setAttribute('aria-pressed', String(!!on[b.dataset.cmd]));
 }
 for (const eventName of ['pointerdown', 'mousedown']) {
@@ -531,7 +537,7 @@ for (const eventName of ['pointerdown', 'mousedown']) {
 el.fmtbar.addEventListener('click', (e) => {
   const cmd = e.target.closest('[data-cmd]')?.dataset.cmd;
   if (!cmd || !drawer) return;
-  if (cmd === 'b' || cmd === 'i') editor.toggleInline(cmd); else editor.toggleType(cmd);
+  if (cmd === 'b' || cmd === 'i' || cmd === 'm') editor.toggleInline(cmd); else editor.toggleType(cmd);
   syncToolbar();
 });
 
@@ -828,7 +834,10 @@ function fitViewport(settled) {
   clearTimeout(settleTimer);
   settleTimer = 0;
 
-  el.app.style.height = keyboard ? height + 'px' : '';
+  // The list card sits near the top, so the page behind it keeps its size (an empty list's
+  // picture would jump otherwise) and the card just moves up out of the keyboard's way.
+  el.app.style.height = keyboard && el.listEdit.hidden ? height + 'px' : '';
+  el.app.classList.toggle('kb', keyboard);
   el.app.style.transform = top ? `translateY(${top}px)` : '';
   el.drawer.classList.toggle('kb', keyboard);
 
@@ -1062,6 +1071,7 @@ function closeMenu() {
 }
 
 el.menuBtn.addEventListener('click', openMenu);
+el.menu.addEventListener('touchstart', () => {}, { passive: true }); // lets iOS show :active on the item you touch
 el.menuScrim.addEventListener('click', closeMenu);
 
 el.menu.addEventListener('click', (e) => {
@@ -1072,6 +1082,8 @@ el.menu.addEventListener('click', (e) => {
 });
 
 /* ---------- the All lists screen ---------- */
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 function renderAll() {
   // Count the open items of every list in one pass, rather than one pass per list.
@@ -1093,6 +1105,7 @@ function renderAll() {
     return row;
   });
   el.allRows.replaceChildren(...rows);
+  el.allCount.textContent = plural(state.lists.length, 'list');
 }
 
 function openAll() {
@@ -1109,24 +1122,16 @@ el.allRows.addEventListener('click', (e) => {
   closeAll();
 });
 
-el.allNew.addEventListener('click', () => {
-  closeAll();
-  newList();
-});
+// The card opens over All lists, so Cancel brings you back here. Save goes to the new list.
+el.allNew.addEventListener('click', () => newList());
 
 /* ---------- new, rename and delete a list ---------- */
 
-function newList() {
-  const last = state.lists[state.lists.length - 1];
-  const list = { id: db.uid(), name: 'New list', icon: 'list', order: last ? last.order + 1 : 0 };
-  state.lists.push(list);
-  save(db.put('lists', list));
-  switchTo(list.id);
-  startRename(); // a new list almost always needs a name
-}
+// New list opens the same card as Edit list. Nothing is made until you tap Save.
+const newList = () => startRename('new');
 
-// Tapping the list name opens a small panel: name and icon.
-let renaming = false;
+// Tapping the list name (or Edit list) opens a card: name and icon, then Cancel or Save.
+let renaming = null; // { mode: 'edit' | 'new', icon } while the card is open
 
 function buildIconGrid() {
   el.iconGrid.replaceChildren(...LIST_ICONS.map((name) => {
@@ -1139,57 +1144,70 @@ function buildIconGrid() {
 }
 
 function markIcon() {
-  const current = iconOf(currentList());
-  for (const b of el.iconGrid.children) b.setAttribute('aria-checked', String(b.dataset.icon === current));
+  for (const b of el.iconGrid.children) b.setAttribute('aria-checked', String(b.dataset.icon === renaming?.icon));
 }
 
-function startRename() {
+function startRename(mode = 'edit') {
   if (renaming) return;
-  renaming = true;
+  const list = currentList();
+  renaming = { mode, icon: mode === 'new' ? 'list' : iconOf(list) };
   if (!el.iconGrid.children.length) buildIconGrid();
   markIcon();
   lockBackground();
+  el.allLists.inert = true; // when opened from All lists, that page stays behind the card
+  el.listEditTitle.textContent = mode === 'new' ? 'New list' : 'Edit list';
   el.listEdit.hidden = false;
   el.editScrim.hidden = false;
-  el.titleInput.value = currentList().name;
+  el.titleInput.value = mode === 'new' ? '' : list.name;
   el.titleInput.focus();
   el.titleInput.select();
 }
 
 function finishRename(keep) {
   if (!renaming) return;
-  renaming = false;
+  const { mode, icon } = renaming;
+  renaming = null;
 
-  const list = currentList();
   const name = el.titleInput.value.trim();
-  if (keep && name && name !== list.name) {
-    list.name = name;
+  let created = null;
+  if (keep && mode === 'new') {
+    const last = state.lists[state.lists.length - 1];
+    created = { id: db.uid(), name: name || 'New list', icon, order: last ? last.order + 1 : 0 };
+    state.lists.push(created);
+    save(db.put('lists', created));
+  } else if (keep) {
+    const list = currentList();
+    if (name) list.name = name;
+    list.icon = icon;
     save(db.put('lists', list));
   }
   el.listEdit.hidden = true;
   el.editScrim.hidden = true;
+  el.allLists.inert = false;
   el.titleInput.blur();
   unlockBackground();
   restoreFocus();
-  render();
+  if (created) {
+    switchTo(created.id);
+    if (!el.allLists.hidden) closeAll();
+  } else render();
 }
 
 el.who.addEventListener('click', () => { if (!animating) startRename(); });
-el.editScrim.addEventListener('click', () => finishRename(true));
+el.editScrim.addEventListener('click', () => finishRename(false));
+el.listEditCancel.addEventListener('click', () => finishRename(false));
+el.listEditSave.addEventListener('click', () => finishRename(true));
 el.titleInput.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   e.preventDefault(); // otherwise the Enter lands on the name button we hand focus back to
   finishRename(true);
 });
 
-// An icon applies straight away, so you see it in the header behind the panel.
+// The icon you pick is kept until Save.
 el.iconGrid.addEventListener('click', (e) => {
   const icon = e.target.closest('button')?.dataset.icon;
-  if (!icon) return;
-  const list = currentList();
-  list.icon = icon;
-  save(db.put('lists', list));
-  el.tileIcon.setAttribute('href', iconHref(list));
+  if (!icon || !renaming) return;
+  renaming.icon = icon;
   markIcon();
 });
 
@@ -1287,7 +1305,7 @@ function renderArchive() {
 function openArchive() {
   cleanUpArchive();
   arch.picks.clear();
-  arch.one = null;
+  arch.quick = false;
   renderArchive();
   setArchMode('idle');
   showScreen(el.archive, el.archiveBack);
@@ -1304,15 +1322,16 @@ const splitKey = (key) => [key.slice(0, key.indexOf(':')), key.slice(key.indexOf
 // What the archive is doing:
 //   idle     tap a restore button, or press and hold to pick rows
 //   pick     rows are picked; the bar offers Restore N and Delete N
-//   restore  a slide to restore one row (`one`) or the picked rows
+//   restore  a slide to restore the picked rows. Tapping a row's restore button starts here
+//            with that row (`quick`); tapping more rows adds them before you slide.
 //   delete   a red slide, twice, to delete the picked rows for good
-const arch = { mode: 'idle', picks: new Set(), one: null };
+const arch = { mode: 'idle', picks: new Set(), quick: false };
 let deleteArmed = false;
 
 function markArchRows() {
   for (const row of el.archiveBody.querySelectorAll('.arch-row')) {
     const key = keyOf(row);
-    row.classList.toggle('picked', arch.picks.has(key) || arch.one === key);
+    row.classList.toggle('picked', arch.picks.has(key));
     row.style.opacity = '';
   }
 }
@@ -1324,27 +1343,45 @@ function setArchMode(mode) {
   const n = arch.picks.size;
   el.archRestore.lastElementChild.textContent = `Restore ${n}`;
   el.archDelete.lastElementChild.textContent = `Delete ${n}`;
-  const restoring = arch.one ? 1 : n;
-  el.restorebarHint.textContent = restoring === 1 ? 'Slide to restore' : `Slide to restore ${restoring}`;
+  el.restorebarHint.textContent = n === 1 ? 'Slide to restore' : `Slide to restore ${n}`;
   deleteArmed = false;
   el.deletebar.classList.remove('final');
   el.deletebarHint.textContent = `Slide to delete ${n}`;
   markArchRows();
 }
 
-// Leaving a slide goes back to the picked rows, or to nothing picked.
+// Leaving a slide goes back to the picked rows. A slide started from a restore button
+// had no picking before it, so it goes back to nothing picked.
 const archBack = () => {
-  arch.one = null;
+  if (arch.quick) arch.picks.clear();
+  arch.quick = false;
   setArchMode(arch.picks.size ? 'pick' : 'idle');
 };
 
+// Picks or unpicks a row. While the restore slide is up, that adds to (or takes from) what it restores.
 function togglePick(key) {
-  arch.one = null;
   if (arch.picks.has(key)) arch.picks.delete(key); else arch.picks.add(key);
-  setArchMode(arch.picks.size ? 'pick' : 'idle');
+  if (!arch.picks.size) arch.quick = false;
+  setArchMode(!arch.picks.size ? 'idle' : arch.mode === 'restore' ? 'restore' : 'pick');
 }
 
+// Copies of archived records as they are now, so Undo can put them back exactly.
+const copy = (record) => ({ ...record });
+const newestFirst = (a, b) => b.archivedAt - a.archivedAt;
+
 function restoreKeys(keys) {
+  const before = { lists: [], items: [] };
+  for (const [kind, id] of keys.map(splitKey)) {
+    if (kind === 'list') {
+      const list = state.archive.lists.find((l) => l.id === id);
+      if (!list) continue;
+      before.lists.push(copy(list));
+      before.items.push(...state.archive.items.filter((i) => i.archivedWith === id).map(copy));
+    } else {
+      const item = state.archive.items.find((i) => i.id === id);
+      if (item) before.items.push(copy(item));
+    }
+  }
   let n = 0;
   for (const [kind, id] of keys.map(splitKey)) {
     if (kind === 'list') {
@@ -1355,33 +1392,75 @@ function restoreKeys(keys) {
       if (item) { restoreItem(item); n++; }
     }
   }
-  return n;
+  return { n, before };
+}
+
+// Undo a restore: the lists and items go back into the archive just as they were.
+function unrestore({ lists, items }) {
+  const listIds = new Set(lists.map((l) => l.id));
+  const itemIds = new Set(items.map((i) => i.id));
+  state.lists = state.lists.filter((l) => !listIds.has(l.id));
+  state.items = state.items.filter((i) => !itemIds.has(i.id));
+  state.archive.lists = [...lists, ...state.archive.lists].sort(newestFirst);
+  state.archive.items = [...items, ...state.archive.items].sort(newestFirst);
+  save(db.batch({ put: [...lists.map((l) => ['lists', l]), ...items.map((i) => ['items', i])] }));
+  if (!state.lists.some((l) => l.id === state.currentId)) state.currentId = state.lists[0].id;
+  render();
+  if (!el.archive.hidden) renderArchive();
 }
 
 // Gone for good, in one transaction. A list takes the items archived with it.
-function deleteForGood(keys) {
+// With `later`, the rows leave the screen now but the database keeps them until the Undo
+// toast has gone (or the app is put away), so Undo can bring them back.
+const UNDO_MS = 5000;
+let pendingDelete = null; // { remove, timer }
+
+function flushDelete() {
+  if (!pendingDelete) return;
+  clearTimeout(pendingDelete.timer);
+  save(db.batch({ remove: pendingDelete.remove }));
+  pendingDelete = null;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushDelete(); });
+addEventListener('pagehide', flushDelete);
+
+function deleteForGood(keys, { later = false } = {}) {
   const remove = [];
+  const gone = { lists: [], items: [] };
   for (const [kind, id] of keys.map(splitKey)) {
     if (kind === 'list') {
+      gone.lists.push(...state.archive.lists.filter((l) => l.id === id));
+      gone.items.push(...state.archive.items.filter((i) => i.archivedWith === id));
       const items = state.archive.items.filter((i) => i.archivedWith === id);
       state.archive.lists = state.archive.lists.filter((l) => l.id !== id);
       state.archive.items = state.archive.items.filter((i) => i.archivedWith !== id);
       remove.push(['lists', id], ...items.map((i) => ['items', i.id]));
     } else {
+      gone.items.push(...state.archive.items.filter((i) => i.id === id));
       state.archive.items = state.archive.items.filter((i) => i.id !== id);
       remove.push(['items', id]);
     }
   }
-  if (remove.length) save(db.batch({ remove }));
-  return keys.length;
+  if (!remove.length) return { n: 0 };
+  if (!later) { save(db.batch({ remove })); return { n: keys.length }; }
+  flushDelete(); // an earlier delete still waiting goes through now
+  pendingDelete = { remove, timer: setTimeout(flushDelete, UNDO_MS) };
+  const undo = () => {
+    clearTimeout(pendingDelete?.timer);
+    pendingDelete = null;
+    state.archive.lists = [...gone.lists, ...state.archive.lists].sort(newestFirst);
+    state.archive.items = [...gone.items, ...state.archive.items].sort(newestFirst);
+    if (!el.archive.hidden) renderArchive();
+  };
+  return { n: keys.length, undo };
 }
 
-function finishArch(message) {
+function finishArch(message, onUndo) {
   arch.picks.clear();
-  arch.one = null;
+  arch.quick = false;
   renderArchive();
   setArchMode('idle');
-  showToast(message);
+  showToast(message, onUndo, UNDO_MS);
 }
 
 el.archRestore.addEventListener('click', () => setArchMode('restore'));
@@ -1395,8 +1474,8 @@ const fadePicked = (p) => {
 };
 
 makeSlider(el.restorebar, () => {
-  const n = restoreKeys(arch.one ? [arch.one] : [...arch.picks]);
-  finishArch(n === 1 ? 'Restored' : `${n} restored`);
+  const { n, before } = restoreKeys([...arch.picks]);
+  finishArch(n === 1 ? 'Restored' : `${n} restored`, () => unrestore(before));
 }, fadePicked);
 
 makeSlider(el.deletebar, () => {
@@ -1406,12 +1485,12 @@ makeSlider(el.deletebar, () => {
     el.deletebarHint.textContent = 'Again. No undo';
     return;
   }
-  const n = deleteForGood([...arch.picks]);
-  finishArch(n === 1 ? 'Deleted for good' : `${n} deleted for good`);
+  const { n, undo } = deleteForGood([...arch.picks], { later: true });
+  finishArch(n === 1 ? 'Deleted' : `${n} deleted`, undo);
 }, fadePicked);
 
-// Tap a row's restore button for a slide that restores just that row.
-// While rows are picked, a tap picks or unpicks a row.
+// Tap a row's restore button for a slide that restores that row.
+// While rows are picked (or the restore slide is up), a tap picks or unpicks a row.
 let archHold = null; // { id, x, y, timer }
 let archHeld = false;
 
@@ -1419,9 +1498,10 @@ el.archiveBody.addEventListener('click', (e) => {
   const row = e.target.closest('.arch-row');
   if (!row) return;
   if (archHeld) { archHeld = false; return; } // the finger lifting after a hold
-  if (arch.mode === 'pick') { togglePick(keyOf(row)); return; }
-  if (e.target.closest('[data-act="restore"]') && (arch.mode === 'idle' || (arch.mode === 'restore' && arch.one))) {
-    arch.one = keyOf(row);
+  if (arch.mode === 'pick' || arch.mode === 'restore') { togglePick(keyOf(row)); return; }
+  if (arch.mode === 'idle' && e.target.closest('[data-act="restore"]')) {
+    arch.picks.add(keyOf(row));
+    arch.quick = true;
     setArchMode('restore');
   }
 });
@@ -1435,7 +1515,7 @@ function cancelArchHold() {
 el.archiveBody.addEventListener('pointerdown', (e) => {
   const row = e.target.closest('.arch-row');
   if (!row || e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (arch.mode === 'delete' || (arch.mode === 'restore' && !arch.one)) return;
+  if (arch.mode === 'delete') return;
   cancelArchHold();
   archHeld = false;
   archHold = { id: e.pointerId, x: e.clientX, y: e.clientY, timer: 0 };
@@ -1487,7 +1567,8 @@ const MAX_DOTS = 5; // more lists than this: a window of five dots that follows 
 
 const currentIndex = () => state.lists.findIndex((l) => l.id === state.currentId);
 
-const DOT_W = 12; // px, the width of one .dot
+const DOT_W = 13; // px, the width of one .dot
+const DOT_EXTRA = 12; // px, how much wider the current list's dot (a pill) is than the rest
 let dotsKey = ''; // which lists the dots were built for
 
 function renderDots() {
@@ -1513,7 +1594,7 @@ function renderDots() {
       return dot;
     }));
     el.dots.replaceChildren(track);
-    el.dots.style.width = `${Math.min(n, MAX_DOTS) * DOT_W}px`;
+    el.dots.style.width = `${Math.min(n, MAX_DOTS) * DOT_W + DOT_EXTRA}px`;
     if (first) { // the first time they just appear
       el.dots.classList.add('still');
       requestAnimationFrame(() => requestAnimationFrame(() => el.dots.classList.remove('still')));
@@ -1998,7 +2079,10 @@ function renderSearch() {
     el.searchBody.replaceChildren(none);
     return;
   }
-  el.searchBody.replaceChildren(...found.map(({ item, terms }) => {
+  const label = document.createElement('h3');
+  label.className = 'list-label';
+  label.textContent = plural(found.length, 'result');
+  el.searchBody.replaceChildren(label, ...found.map(({ item, terms }) => {
     const row = fromTemplate('tpl-search-row');
     row.dataset.id = item.id;
     highlight(row.querySelector('.search-title'), item.title, terms);
@@ -2043,6 +2127,7 @@ el.searchBody.addEventListener('click', (e) => {
 
 const THEME_KEY = 'find-notes:theme';
 const ICONS_KEY = 'find-notes:icons';
+const STYLE_KEY = 'find-notes:style'; // 'sketch', or nothing for Clean
 const phoneIsLight = window.matchMedia('(prefers-color-scheme: light)');
 
 // Light, Dark, or Auto (follow the phone). Nothing saved yet means Auto.
@@ -2054,12 +2139,17 @@ function savedTheme() {
 }
 
 let theme = savedTheme();
+let sketch = false;
+try { sketch = localStorage.getItem(STYLE_KEY) === 'sketch'; } catch { /* storage blocked: Clean */ }
 
+// Sketch is a light-only look: while it is on, the theme choice waits in the background.
 function applyTheme() {
-  const light = theme === 'light' || (theme === 'auto' && phoneIsLight.matches);
+  const light = sketch || theme === 'light' || (theme === 'auto' && phoneIsLight.matches);
   document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  if (sketch) document.documentElement.dataset.style = 'sketch';
+  else delete document.documentElement.dataset.style;
   document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', light ? '#fbfbfa' : '#15181a');
+    ?.setAttribute('content', sketch ? '#f8f8ff' : light ? '#fbfbfa' : '#15181a');
 }
 
 applyTheme();
@@ -2067,8 +2157,20 @@ applyTheme();
 phoneIsLight.addEventListener('change', applyTheme);
 
 function markTheme() {
-  for (const b of el.themeSeg.children) b.setAttribute('aria-checked', String(b.dataset.themeChoice === theme));
+  for (const b of el.themeSeg.children) {
+    b.setAttribute('aria-checked', String(b.dataset.themeChoice === theme));
+    b.disabled = sketch;
+  }
+  el.themeNote.hidden = !sketch;
+  el.sketchSwitch.setAttribute('aria-checked', String(sketch));
 }
+
+el.sketchSwitch.addEventListener('click', () => {
+  sketch = !sketch;
+  try { if (sketch) localStorage.setItem(STYLE_KEY, 'sketch'); else localStorage.removeItem(STYLE_KEY); } catch { /* storage blocked */ }
+  applyTheme();
+  markTheme();
+});
 
 el.themeSeg.addEventListener('click', (e) => {
   const choice = e.target.closest('button')?.dataset.themeChoice;
@@ -2125,9 +2227,8 @@ function askToPersist() {
 }
 
 function countText() {
-  const n = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
   const archived = state.archive.lists.length + looseArchivedItems().length;
-  return `${n(state.lists.length, 'list')} · ${n(state.items.length, 'item')} · ${archived} archived`;
+  return `${plural(state.lists.length, 'list')} · ${plural(state.items.length, 'item')} · ${archived} archived`;
 }
 
 function markCleanup() {
@@ -2269,7 +2370,7 @@ function disarmImport() {
   pendingImport = null;
   const b = el.importBtn;
   b.classList.remove('sure');
-  b.textContent = 'Restore from a backup';
+  b.textContent = 'Restore';
 }
 
 function readBackup(text) {
@@ -2350,8 +2451,8 @@ el.importFile.addEventListener('change', async (e) => {
     pendingImport = readBackup(await file.text());
     const b = el.importBtn;
     b.classList.add('sure');
-    b.textContent = `Restore ${pendingImport.lists.length} lists, ${pendingImport.items.length} items?`;
-    say('Tap again to add them to what is here. Nothing is deleted.');
+    b.textContent = 'Restore?';
+    say(`Tap Restore again to add ${pendingImport.lists.length} lists and ${pendingImport.items.length} items to what is here. Nothing is deleted.`);
     clearTimeout(importTimer);
     importTimer = setTimeout(() => { disarmImport(); say(''); }, 8000);
   } catch (err) {

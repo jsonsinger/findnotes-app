@@ -128,6 +128,9 @@
     <symbol id="i-box" viewBox="0 0 24 24">
       <path d="M3.5 4h17v4h-17zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>
     </symbol>
+    <symbol id="i-marker" viewBox="0 0 24 24">
+      <path d="M14.5 4.5l5 5-8 8h-5v-5zM6.5 12.5l5 5M4 21h9"/>
+    </symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24">
       <path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/>
     </symbol>
@@ -220,6 +223,7 @@
             <button data-cmd="i" aria-label="Italic" aria-pressed="false"><span class="fmt-i">I</span></button>
             <button data-cmd="li" aria-label="Bulleted list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bullets"/></svg></button>
             <button data-cmd="task" aria-label="Tick box list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-task"/></svg></button>
+            <button data-cmd="m" aria-label="Highlight" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg></button>
         </div>
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
@@ -234,16 +238,24 @@
    </div>
 
    <div class="menu-scrim" id="edit-scrim" hidden></div>
-   <div class="listedit" id="listedit" role="dialog" aria-label="Edit list" hidden>
-     <input class="title-input" id="title-input" type="text" maxlength="40" aria-label="List name" autocomplete="off" enterkeyhint="done">
+   <div class="listedit" id="listedit" role="dialog" aria-labelledby="listedit-title" hidden>
+     <h3 class="listedit-title" id="listedit-title">Edit list</h3>
+     <input class="title-input" id="title-input" type="text" maxlength="40" placeholder="List name" aria-label="List name" autocomplete="off" enterkeyhint="done">
+     <div class="listedit-label">Icon</div>
      <div class="icon-grid" id="icon-grid" role="radiogroup" aria-label="List icon"></div>
+     <div class="listedit-actions">
+       <button class="setting-btn" id="listedit-cancel">Cancel</button>
+       <button class="setting-btn go" id="listedit-save">Save</button>
+     </div>
    </div>
 
    <section class="screen" id="all-lists" role="dialog" aria-modal="true" aria-label="All lists" hidden>
      <header class="header">
+       <span class="tile"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
        <h2>All lists</h2>
      </header>
      <div class="screen-body">
+       <h3 class="list-label" id="all-count"></h3>
        <div id="all-rows"></div>
      </div>
      <button class="addbar" id="all-new">
@@ -294,7 +306,10 @@
        <button class="icon-btn" id="search-back" aria-label="Back">
          <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
        </button>
-       <input class="search-input" id="search-input" type="search" placeholder="Search all lists" aria-label="Search all lists" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+       <label class="search-field">
+         <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+         <input class="search-input" id="search-input" type="search" placeholder="Search all lists" aria-label="Search all lists" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+       </label>
      </header>
      <div class="screen-body" id="search-body"></div>
    </section>
@@ -305,36 +320,59 @@
        </button>
        <h2>Settings</h2>
      </header>
-     <div class="screen-body">
-       <h3 class="arch-heading">Appearance</h3>
-       <div class="setting">
-         <span>Theme</span>
-         <div class="seg" id="theme-seg" role="radiogroup" aria-label="Theme">
-           <button role="radio" data-theme-choice="light">Light</button>
-           <button role="radio" data-theme-choice="dark">Dark</button>
-           <button role="radio" data-theme-choice="auto">Auto</button>
+     <div class="screen-body settings-body">
+       <h3 class="group-label">Appearance</h3>
+       <div class="group">
+         <div class="setting">
+           <span class="setting-label">Theme<small id="theme-note" hidden>Sketch is always light</small></span>
+           <div class="seg" id="theme-seg" role="radiogroup" aria-label="Theme">
+             <button role="radio" data-theme-choice="light">Light</button>
+             <button role="radio" data-theme-choice="dark">Dark</button>
+             <button role="radio" data-theme-choice="auto">Auto</button>
+           </div>
+         </div>
+         <div class="setting">
+           <span class="setting-label" id="sketch-label">Sketch style<small>A hand-drawn look</small></span>
+           <button class="switch" id="sketch-switch" role="switch" aria-checked="false" aria-labelledby="sketch-label"></button>
+         </div>
+         <div class="setting">
+           <span class="setting-label" id="icons-label">Show icons<small>Next to lists and menu items</small></span>
+           <button class="switch" id="icons-switch" role="switch" aria-checked="true" aria-labelledby="icons-label"></button>
          </div>
        </div>
-       <div class="setting">
-         <span class="setting-label" id="icons-label">Show icons<small>Next to lists and menu items</small></span>
-         <button class="switch" id="icons-switch" role="switch" aria-checked="true" aria-labelledby="icons-label"></button>
+       <h3 class="group-label">Your data</h3>
+       <div class="group">
+         <div class="setting">
+           <span class="setting-label">Export a backup<small>A file to keep somewhere safe</small></span>
+           <button class="setting-btn" id="export-btn">Export</button>
+         </div>
+         <div class="setting">
+           <span class="setting-label">Restore from a backup<small>Adds to what is here</small></span>
+           <button class="setting-btn" id="import-btn">Restore</button>
+         </div>
+         <div class="setting">
+           <span class="setting-label" id="cleanup-label">Auto clean-up<small>Deletes archived things for good</small></span>
+           <button class="switch" id="cleanup-switch" role="switch" aria-checked="false" aria-labelledby="cleanup-label"></button>
+         </div>
+         <div class="setting">
+           <label class="setting-label" for="cleanup-days">Days in the archive<small>Before clean-up deletes them, 1 to 999</small></label>
+           <input class="days" id="cleanup-days" type="number" inputmode="numeric" min="1" max="999" value="30">
+         </div>
        </div>
-       <h3 class="arch-heading">Your data</h3>
-       <p class="setting-note">Your notes live only on this device. A backup is a file you can keep somewhere safe and bring back later. Save it to Files or Drive, in a folder called FindNotes, so it is easy to find.</p>
-       <div class="setting"><button class="setting-btn" id="export-btn">Export a backup</button></div>
-       <div class="setting"><button class="setting-btn" id="import-btn">Restore from a backup</button></div>
        <input type="file" id="import-file" accept="application/json,.json" hidden>
+       <p class="setting-note">Your notes live only on this device. Save backups to Files or Drive, in a folder called FindNotes, so they are easy to find.</p>
        <p class="setting-note" id="backup-status" role="status"></p>
-       <div class="setting">
-         <span class="setting-label" id="cleanup-label">Auto clean-up<small>Delete after <input class="days" id="cleanup-days" type="number" inputmode="numeric" min="1" max="999" value="30" aria-label="Days in the archive before deleting"> days in the archive</small></span>
-         <button class="switch" id="cleanup-switch" role="switch" aria-checked="false" aria-labelledby="cleanup-label"></button>
+       <h3 class="group-label">About</h3>
+       <div class="group">
+         <div class="setting"><span>Your notes</span><span class="setting-value" id="counts"></span></div>
+         <div class="setting"><span>Version</span><span class="setting-value" id="version"></span></div>
+         <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
+         <div class="setting">
+           <span class="setting-label">Reset storage<small>Deletes every list and note here</small></span>
+           <button class="setting-btn danger" id="reset-btn">Reset</button>
+         </div>
        </div>
-       <h3 class="arch-heading">About</h3>
-       <div class="setting"><span>Your notes</span><span class="setting-value" id="counts"></span></div>
-       <div class="setting"><span>Version</span><span class="setting-value" id="version"></span></div>
-       <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
-       <p class="setting-note">If notes stop saving, resetting starts this device afresh. It deletes every list and note here, so export a backup first if you can.</p>
-       <div class="setting"><button class="setting-btn danger" id="reset-btn">Reset storage</button></div>
+       <p class="made-by">Made by Quirks</p>
      </div>
      <div class="selbar danger" id="cleanupbar" hidden>
        <div class="sel-fill"></div>
@@ -390,7 +428,7 @@
     </div>
   </template>
   <template id="tpl-search-row">
-    <button class="search-row"><span class="search-title"></span><span class="search-snippet"></span><span class="search-where"></span></button>
+    <button class="search-row"><span class="search-title"></span><span class="search-where"></span><span class="search-snippet"></span></button>
   </template>
   <template id="tpl-icon-choice">
     <button role="radio"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></button>

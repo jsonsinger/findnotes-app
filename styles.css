@@ -1,3 +1,19 @@
+/* Caveat and Karla are only for the Sketch style. Bundled (and saved for offline use by sw.js),
+   so nothing is fetched from elsewhere. Latin letters only, to keep them small. */
+@font-face {
+  font-family: 'Caveat';
+  src: url(fonts/Caveat.woff2) format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Karla';
+  src: url(fonts/Karla.woff2) format('woff2');
+  font-weight: 400 800;
+  font-display: swap;
+}
+
 /* Dark is the fallback; Settings > Theme picks Light, Dark or Auto (follow the phone).
    Dark: near-black with soft gold. Light: cool whites with a light yellow. */
 :root {
@@ -71,7 +87,42 @@
 
 html, body { overscroll-behavior: none; overflow: hidden; height: 100%; }
 
+/* An app, not a page: a long press never selects words or pops up the copy menu.
+   The note editor turns selection back on. */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* The gold caret, like the mock-ups. Sketch writes in ink. */
+input, [contenteditable] { caret-color: var(--accent); }
+[data-style='sketch'] :is(input, [contenteditable]) { caret-color: var(--text); }
+::selection { background: var(--accent-soft); }
+
 /* The icon sprite at the top of index.html takes no space */
+:root {
+  accent-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input:focus,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.title-input:focus,
+.title-input:focus-visible,
+.search-input:focus,
+.search-input:focus-visible {
+  outline: 0;
+}
+
 .sprite { position: absolute; }
 
 #item-title, #item-body { scrollbar-width: none; }
@@ -113,15 +164,15 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 22px) 14px 8px 18px;
-  min-height: 66px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 14px 10px 16px; /* tucked up under the camera, like the mock-ups */
+  min-height: 58px;
 }
 
 h1, h2 {
   flex: 1;
   min-width: 0;
   font-size: 22px;
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -149,12 +200,16 @@ h1, h2 {
 }
 
 .header h1 {
-  color: var(--text-muted);
+  color: var(--text);
+}
+
+.header .icon-btn {
+  color: var(--text);
 }
 
 .tile {
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   border-radius: 9px;
   background: var(--tile-bg);
   color: var(--tile-text);
@@ -164,8 +219,8 @@ h1, h2 {
 }
 
 .tile .icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .tile.small {
@@ -247,7 +302,7 @@ h1, h2 {
 }
 
 .empty {
-  min-height: 55%;
+  min-height: 100%; /* centred in the space above the add bar */
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -310,6 +365,7 @@ h1, h2 {
 /* One item in the list */
 .row {
   position: relative;
+  isolation: isolate; /* keeps the selected row's yellow (::before) above the list, below the text */
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -322,8 +378,6 @@ h1, h2 {
 
 /* Long-press selects a row. A selected row has a gold circle and a lighter background. */
 .row.selected {
-  background: var(--accent-soft);
-  border-radius: 12px;
   border-top-color: transparent;
   margin: 0 8px;
   padding-left: 0;
@@ -332,6 +386,15 @@ h1, h2 {
 
 .row.selected + .row {
   border-top-color: transparent;
+}
+
+.row.selected::before {
+  content: '';
+  position: absolute;
+  inset: 2px 0;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  z-index: -1;
 }
 
 .row.selected .circle {
@@ -470,10 +533,10 @@ h1, h2 {
 }
 
 .circle {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
+  border: 1.8px solid var(--text-muted);
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -487,7 +550,9 @@ h1, h2 {
 }
 
 .row.done .circle {
-  border-color: var(--line);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .row.done .circle .icon {
@@ -502,8 +567,9 @@ h1, h2 {
 
 .row-title {
   display: block;
-  font-size: 16px;
-  line-height: 1.35;
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .row.done .row-title {
@@ -686,7 +752,6 @@ h1, h2 {
   -webkit-touch-callout: default;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  caret-color: var(--accent-text);
 }
 
 /* With the formatting bar showing there has to be room under the last line */
@@ -820,6 +885,19 @@ h1, h2 {
   height: 22px;
 }
 
+/* Highlighted text in a note, saved as ==text== */
+#item-body mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:root[data-theme='light'] #item-body mark {
+  background: rgba(249, 221, 122, 0.75);
+  color: inherit;
+}
+
 .fmt-h { font-weight: 600; }
 .fmt-h sub { font-size: 11px; vertical-align: baseline; position: relative; top: 3px; }
 .fmt-b { font-weight: 700; }
@@ -930,59 +1008,93 @@ h1, h2 {
 /* Tapping the list name opens this: rename or pick an icon */
 .listedit {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
-  left: 12px;
-  right: 12px;
-  padding: 14px 14px 6px;
-  background: var(--popover-bg);
-  border: 0.5px solid var(--line-strong);
+  top: calc(env(safe-area-inset-top, 0px) + 90px);
+  left: 16px;
+  right: 16px;
+  padding: 18px 16px 16px;
+  background: var(--surface);
+  border: 0;
   border-radius: 16px;
   box-shadow: var(--shadow-popover);
-  z-index: 8;
+  z-index: 9;
+}
+
+/* With the keyboard up, the card moves to the top so its buttons stay in sight */
+#app.kb .listedit { top: calc(env(safe-area-inset-top, 0px) + 12px); }
+#edit-scrim { z-index: 8; }
+
+.listedit-title {
+  font-size: 19px;
+  font-weight: 700;
 }
 
 .title-input {
   display: block;
   width: 100%;
+  height: 48px;
+  margin-top: 12px;
+  padding: 0 14px;
   font: inherit;
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 16px;
   color: var(--text);
-  background: none;
-  border: 0;
-  border-bottom: 1.5px solid var(--accent);
-  border-radius: 0;
+  background: var(--bg);
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
   outline: 0;
-  padding: 0 0 6px;
+}
+
+.listedit-label {
+  padding: 16px 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .icon-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
-  margin: 14px 0 8px;
-  justify-items: center;
 }
 
 .icon-grid button {
-  width: 48px;
-  height: 48px;
+  aspect-ratio: 1;
   border-radius: 9px;
   display: grid;
   place-items: center;
-  color: var(--text-muted);
-  background: var(--tile-bg);
-  border: 1.5px solid transparent;
+  color: var(--text);
+  background: var(--bg);
 }
 
 .icon-grid button[aria-checked='true'] {
-  color: var(--tile-text);
-  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .icon-grid .icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+}
+
+.listedit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.listedit-actions .setting-btn {
+  min-height: 40px;
+  padding: 0 18px;
+  background: var(--bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.listedit-actions .setting-btn.go {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Three-dots menu */
@@ -994,7 +1106,7 @@ h1, h2 {
 
 .menu {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  top: calc(env(safe-area-inset-top, 0px) + 44px);
   right: 12px;
   width: 214px;
   padding: 6px 0;
@@ -1019,6 +1131,29 @@ h1, h2 {
   width: 20px;
   height: 20px;
   color: var(--text-muted);
+}
+
+.menu {
+  padding: 6px;
+}
+
+.menu button {
+  border-radius: 8px;
+  padding: 0 12px;
+  font-weight: 600;
+}
+
+.menu button:not(:disabled):is(:active, :focus-visible) {
+  outline: 0;
+  background: var(--accent-soft);
+}
+
+.menu button:not(:disabled):is(:active, :focus-visible) .icon {
+  color: var(--accent-text);
+}
+
+.menu hr {
+  margin: 5px 8px;
 }
 
 .menu hr {
@@ -1049,14 +1184,44 @@ h1, h2 {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 90px); /* room for the add bar */
 }
 
+.screen > .header .tile { margin-right: 4px; }
+.screen > .header h2 { line-height: 38px; }
+
+/* "5 lists", "3 results": the small label above a full-screen list */
+.list-label {
+  padding: 6px 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+#all-lists .screen-body,
+#search-body {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
 .all-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-  min-height: 64px;
-  padding: 0 20px;
-  font-size: 17px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.all-row:last-child { border-bottom: 0; }
+
+.all-row .tile.small {
+  width: 36px;
+  height: 36px;
+}
+
+.all-row .tile.small .icon {
+  width: 22px;
+  height: 22px;
 }
 
 .all-name {
@@ -1065,16 +1230,25 @@ h1, h2 {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .all-count {
   flex: none;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.all-row.current .all-name {
-  font-weight: 500;
+/* The list you're on: a gold tile. With icons hidden, the name turns gold instead. */
+.all-row.current .tile {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.no-icons .all-row.current .all-name {
   color: var(--accent-text);
 }
 
@@ -1098,27 +1272,30 @@ h1, h2 {
 
 .dot {
   flex: none;
-  width: 12px;
+  width: 13px; /* DOT_W in app.js */
   height: 28px;
   display: grid;
   place-items: center;
+  transition: width 220ms ease-out;
 }
 
 .dot::before {
   content: '';
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  opacity: 0.5;
-  transition: width 220ms ease-out, height 220ms ease-out, opacity 220ms ease-out, background-color 220ms ease-out;
+  border-radius: 3px;
+  background: var(--line-strong);
+  transition: width 220ms ease-out, height 220ms ease-out, background-color 220ms ease-out;
+}
+
+/* The current list: a gold pill, its slot wider by DOT_EXTRA in app.js */
+.dot[aria-current='true'] {
+  width: 25px;
 }
 
 .dot[aria-current='true']::before {
-  width: 8px;
-  height: 8px;
-  background: var(--text);
-  opacity: 1;
+  width: 18px;
+  background: var(--accent);
 }
 
 .dot.edge::before {
@@ -1181,6 +1358,9 @@ h1, h2 {
   gap: 12px;
   min-height: 64px;
   padding: 0 8px 0 20px;
+  /* Clear edges, so picked rows next to each other show a gap without anything moving */
+  border-block: 2px solid transparent;
+  background-clip: padding-box;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -1201,34 +1381,53 @@ h1, h2 {
 }
 
 .arch-name { font-size: 17px; }
+
+.arch-row [data-act='restore'] {
+  width: 38px;
+  height: 38px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent-text);
+}
+
+.arch-row [data-act='restore'] .icon {
+  width: 19px;
+  height: 19px;
+}
 .arch-sub { font-size: 13px; color: var(--text-muted); }
 
-/* Picking rows in the archive: a circle shows on every row, picked rows turn yellow,
-   and red when they are about to be deleted. */
+/* Picking rows in the archive: a circle takes the icon's place on every row (so the text
+   stays put), picked rows turn yellow, and red when they are about to be deleted. */
 .arch-row .circle {
   display: none;
   flex: none;
+  margin: 0 10px;
 }
 
-#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row .circle,
-#archive[data-mode='restore'] .arch-row.picked .circle {
+#archive:not([data-mode='idle']) .arch-row .circle {
   display: grid;
 }
 
-#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row [data-act='restore'],
-#archive[data-mode='restore'] .arch-row.picked [data-act='restore'] {
+#archive:not([data-mode='idle']) .arch-row .tile {
   display: none;
+}
+
+#archive:not([data-mode='idle']) .arch-row.picked [data-act='restore'],
+#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row [data-act='restore'] {
+  visibility: hidden;
+}
+
+/* With icons off there is no icon to swap, so the circle never takes up room in idle either */
+.no-icons #archive:not([data-mode='idle']) .arch-row .circle {
+  margin: 0;
 }
 
 .arch-row.picked {
   margin: 0 8px;
   padding-left: 12px;
-  border-radius: 12px;
-  background: var(--accent-soft);
-}
-
-.arch-row.picked + .arch-row.picked {
-  margin-top: 4px;
+  border-radius: 14px; /* 12px, plus the clear edge */
+  background-color: var(--accent-soft);
 }
 
 .arch-row.picked .circle {
@@ -1242,7 +1441,7 @@ h1, h2 {
 }
 
 #archive[data-mode='delete'] .arch-row.picked {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background-color: color-mix(in srgb, var(--danger) 16%, transparent);
 }
 
 #archive[data-mode='delete'] .arch-row.picked .circle {
@@ -1322,7 +1521,52 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* Settings */
+/* Settings: rows in rounded groups, each group under a small label */
+.settings-body {
+  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 90px);
+}
+
+.group-label {
+  padding: 18px 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.group {
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.group .setting {
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--line);
+}
+
+.group .setting:last-child {
+  border-bottom: 0;
+}
+
+/* Inside a group, controls sit a shade lighter than the group */
+.group :is(.seg, .setting-btn, .switch, .days) {
+  background: var(--bg);
+}
+
+.group .setting-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+  flex: none;
+}
+
+.settings-body .setting-note {
+  padding: 8px 4px 0;
+}
+
 .setting {
   display: flex;
   align-items: center;
@@ -1336,6 +1580,14 @@ h1, h2 {
 .setting-value {
   color: var(--text-muted);
   font-size: 15px;
+}
+
+.made-by {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
 }
 
 .setting-note {
@@ -1386,14 +1638,16 @@ h1, h2 {
 
 /* The number of days for auto clean-up, typed straight into the sentence */
 .days {
-  width: 3.4em;
-  margin: 0 2px;
-  padding: 1px 4px;
+  width: 72px;
+  height: 36px;
+  flex: none;
+  padding: 0 8px;
+  font-size: 16px; /* 16px or more, or phones zoom in when you tap it */
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: var(--bg);
   color: var(--text);
-  font: inherit;
+  font-family: inherit;
   font-weight: 600;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -1477,17 +1731,35 @@ h1, h2 {
 }
 
 /* Search */
+.search-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--tile-bg);
+  cursor: text;
+}
+
+.search-field .icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  flex: none;
+}
+
 .search-input {
   flex: 1;
   min-width: 0;
-  height: 40px;
-  padding: 0 14px;
+  height: 100%;
   font: inherit;
-  font-size: 17px;
+  font-size: 16px;
   color: var(--text);
-  background: var(--tile-bg);
+  background: none;
   border: 0;
-  border-radius: 12px;
   outline: 0;
   -webkit-appearance: none;
   appearance: none;
@@ -1504,9 +1776,12 @@ h1, h2 {
 .search-row {
   display: block;
   width: 100%;
-  padding: 12px 20px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--line);
   text-align: left;
 }
+
+.search-row:last-child { border-bottom: 0; }
 
 .search-title,
 .search-snippet,
@@ -1517,14 +1792,14 @@ h1, h2 {
   text-overflow: ellipsis;
 }
 
-.search-title { font-size: 17px; }
-.search-snippet { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
-.search-where { font-size: 12px; color: var(--text-muted); margin-top: 4px; opacity: 0.8; }
+.search-title { font-size: 16.5px; font-weight: 600; line-height: 1.3; }
+.search-where { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.search-snippet { font-size: 13.5px; line-height: 1.4; color: var(--text-muted); margin-top: 4px; }
 
 .search-row mark {
   background: none;
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 800;
 }
 
 /* In light, gold text is hard to read, so matches get a yellow wash behind ink instead */
@@ -1551,3 +1826,165 @@ h1, h2 {
 #list.archiving[style*="opacity"] {
   transition: none;
 }
+
+
+/* ---------- Sketch: a hand-drawn look. Light only, white paper, inked outlines ----------
+   Caveat for anything you'd write by hand (titles, buttons, labels), Karla for reading. */
+:root[data-style='sketch'] {
+  --bg: #f8f8ff;
+  --surface: #ffffff;
+  --bar-bg: #ffffff;
+  --popover-bg: #ffffff;
+  --text: #2b2a26;
+  --text-muted: #55585f;
+  --accent: #f9dd7a;
+  --accent-soft: rgba(249, 221, 122, 0.6);
+  --accent-text: #2b2a26;
+  --on-accent: #2b2a26;
+  --bullet: #2b2a26;
+  --line: #c5c8d0;
+  --line-strong: #2b2a26;
+  --tile-bg: #ffffff;
+  --tile-text: #2b2a26;
+  --toast-bg: #2b2a26;
+  --ink: #2b2a26;
+  --ink-line: 2px solid var(--ink);
+  --hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --wobble: 16px 12px 17px 13px / 13px 17px 12px 16px;
+  --wobble-sm: 10px 8px 11px 7px / 7px 11px 8px 10px;
+  --wobble-round: 52% 48% 50% 50% / 50% 52% 48% 50%;
+}
+
+[data-style='sketch'] body {
+  font-family: 'Karla', system-ui, sans-serif;
+}
+
+[data-style='sketch'] :is(h1, h2, .row-title, .addbar > span:first-child, .sel-label, .sel-hint, .arch-btn, .arch-hint,
+  .menu button, .all-name, .arch-name, .search-title, .setting > span:first-child, .setting-label, .setting-btn,
+  .seg button, .empty strong, #item-title, .title-input, #item-body .b.h, #item-body .b.h3, .arch-heading) {
+  font-family: var(--hand);
+}
+
+/* Caveat is small for its size, so the hand-written bits go up a few sizes */
+[data-style='sketch'] :is(h1, h2) { font-size: 32px; font-weight: 700; color: var(--text); }
+[data-style='sketch'] .row-title { font-size: 24px; font-weight: 600; line-height: 1.1; }
+[data-style='sketch'] .addbar { font-size: 24px; }
+[data-style='sketch'] :is(.menu button, .setting > span:first-child, .setting-label) { font-size: 22px; font-weight: 600; }
+[data-style='sketch'] .setting-label small { font-family: 'Karla', system-ui, sans-serif; font-weight: 400; }
+[data-style='sketch'] :is(.all-name, .arch-name, .search-title) { font-size: 23px; font-weight: 600; }
+[data-style='sketch'] :is(.setting-btn, .arch-btn, .seg button, .sel-label) { font-size: 21px; font-weight: 600; }
+[data-style='sketch'] :is(.sel-hint, .arch-hint) { font-size: 19px; }
+[data-style='sketch'] .arch-heading { font-size: 21px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .empty strong { font-size: 34px; line-height: 0.95; }
+[data-style='sketch'] #item-title { font-size: 36px; line-height: 1; }
+[data-style='sketch'] .title-input { font-size: 28px; }
+[data-style='sketch'] #item-body .b.h { font-size: 28px; line-height: 1.1; }
+[data-style='sketch'] #item-body .b.h3 { font-size: 23px; }
+
+/* Inked outlines and wobbly corners */
+[data-style='sketch'] :is(.tile, .addbar, .selbar, .menu, .listedit, .fmtbar, .setting-btn, .seg, .search-field,
+  .arch-btn, .empty-icon, .toast) {
+  border: var(--ink-line);
+  border-radius: var(--wobble);
+}
+
+[data-style='sketch'] :is(.tile, .tile.small, .icon-grid button, .sel-knob, .sel-fill, .fmtbar button, .seg button) {
+  border-radius: var(--wobble-sm);
+}
+
+[data-style='sketch'] .tile { background: var(--accent); }
+[data-style='sketch'] :is(.all-row, .arch-row) .tile { background: var(--surface); }
+[data-style='sketch'] .all-row.current .tile { background: var(--accent); color: var(--text); }
+[data-style='sketch'] :is(.all-row, .search-row) { border-bottom: 2px dashed var(--line); }
+[data-style='sketch'] :is(.all-row, .search-row):last-child { border-bottom: 0; }
+[data-style='sketch'] .search-field { background: var(--popover-bg); }
+[data-style='sketch'] .list-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .made-by { font-family: var(--hand); font-size: 20px; }
+[data-style='sketch'] .sel-knob { border: var(--ink-line); }
+[data-style='sketch'] .selbar { overflow: visible; }
+[data-style='sketch'] .selbar.danger .sel-knob { color: #fff; }
+[data-style='sketch'] .icon-grid button { border: 2px solid var(--line); }
+[data-style='sketch'] .icon-grid button[aria-checked='true'] { border: var(--ink-line); }
+[data-style='sketch'] .seg button[aria-checked='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
+[data-style='sketch'] .fmtbar button[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* Round things are drawn round, a little lopsided */
+[data-style='sketch'] :is(.addbar-plus, .circle, #done) {
+  border: var(--ink-line);
+  border-radius: var(--wobble-round);
+}
+
+[data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
+
+/* Popovers sit on a hard shadow, like paper cut-outs */
+[data-style='sketch'] .menu { box-shadow: 5px 5px 0 var(--ink); }
+[data-style='sketch'] .listedit { box-shadow: 6px 6px 0 var(--ink); }
+[data-style='sketch'] .menu hr { border-top: 2px dashed var(--line); }
+
+/* Dashed rules between rows */
+[data-style='sketch'] .row { border-top: 2px dashed var(--line); }
+[data-style='sketch'] :is(.row.selected, .row.selected + .row) { border-top-color: transparent; }
+[data-style='sketch'] .row.selected::before,
+[data-style='sketch'] .arch-row.picked { border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px; }
+
+/* A ticked item is crossed out with a pen line, not a font strike */
+[data-style='sketch'] .row.done .row-title {
+  width: fit-content;
+  max-width: 100%;
+  text-decoration: none;
+  background: linear-gradient(transparent 54%, var(--ink) 54%, var(--ink) calc(54% + 2px), transparent calc(54% + 2px));
+}
+
+/* The note sheet */
+[data-style='sketch'] .drawer {
+  border: var(--ink-line);
+  border-width: calc(2px * (1 - var(--full))) calc(2px * (1 - var(--full))) 0; /* no frame once it fills the screen */
+  border-radius: calc(20px * (1 - var(--full))) calc(16px * (1 - var(--full))) 0 0 / calc(16px * (1 - var(--full))) calc(20px * (1 - var(--full))) 0 0;
+}
+
+[data-style='sketch'] .grab span { background: var(--line); }
+[data-style='sketch'] .meta { border-bottom: 2px dashed var(--line); }
+[data-style='sketch'] #item-body .b.task::before { border: 2px solid var(--ink); border-radius: 5px 4px 6px 3px; }
+
+/* A highlighter stroke across the lower half of the words */
+/* :root, so it outranks the light theme's highlight */
+:root[data-style='sketch'] #item-body mark {
+  border-radius: 0;
+  background: linear-gradient(transparent 50%, var(--accent-soft) 50%, var(--accent-soft) 94%, transparent 94%);
+}
+
+[data-style='sketch'] .search-row mark {
+  background: var(--accent-soft);
+  color: inherit;
+}
+
+/* Page dots are drawn in outline */
+[data-style='sketch'] .dot::before { background: none; border: 1.5px solid var(--ink); opacity: 0.7; }
+[data-style='sketch'] .dot[aria-current='true']::before { background: var(--ink); opacity: 1; }
+
+[data-style='sketch'] .switch { box-shadow: inset 0 0 0 2px var(--ink); }
+[data-style='sketch'] .switch::after { background: var(--ink); }
+[data-style='sketch'] .days { border: 1.5px solid var(--ink); border-radius: 5px 4px 6px 3px; }
+[data-style='sketch'] .seg button:disabled { opacity: 0.4; }
+
+[data-style='sketch'] .group {
+  border: var(--ink-line);
+  border-radius: var(--wobble);
+  background: var(--surface);
+}
+
+[data-style='sketch'] .group .setting { border-bottom: 2px dashed var(--line); }
+[data-style='sketch'] .group .setting:last-child { border-bottom: 0; }
+[data-style='sketch'] .group-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .group .days { border-radius: var(--wobble-sm); }
+
+[data-style='sketch'] .listedit-title { font-family: var(--hand); font-size: 30px; line-height: 1; }
+[data-style='sketch'] .title-input { border: var(--ink-line); border-radius: var(--wobble-sm); font-family: var(--hand); font-size: 25px; }
+[data-style='sketch'] .listedit-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .icon-grid button { background: var(--surface); }
+[data-style='sketch'] .icon-grid button[aria-checked='true'] { background: var(--accent); }
+[data-style='sketch'] .listedit-actions .setting-btn { background: var(--surface); }
+[data-style='sketch'] .listedit-actions .setting-btn.go { background: var(--accent); }
+[data-style='sketch'] .arch-row [data-act='restore'] { border: var(--ink-line); border-radius: var(--wobble-round); background: var(--surface); color: var(--ink); }
+[data-style='sketch'] .dot[aria-current='true']::before { border-radius: 4px; background: var(--accent); border-color: var(--ink); }
