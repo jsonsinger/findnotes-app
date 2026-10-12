@@ -11,7 +11,7 @@
   <meta name="description" content="Lists that can grow into notes.">
   <meta name="color-scheme" content="dark">
   <script src="theme.js"></script>
-  <meta name="theme-color" content="#171716">
+  <meta name="theme-color" content="#15181a">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -266,9 +266,14 @@
        <div class="setting">
          <span>Theme</span>
          <div class="seg" id="theme-seg" role="radiogroup" aria-label="Theme">
-           <button role="radio" data-theme-choice="dark">Dark</button>
            <button role="radio" data-theme-choice="light">Light</button>
+           <button role="radio" data-theme-choice="dark">Dark</button>
+           <button role="radio" data-theme-choice="auto">Auto</button>
          </div>
+       </div>
+       <div class="setting">
+         <span class="setting-label" id="icons-label">Show icons<small>Next to each list</small></span>
+         <button class="switch" id="icons-switch" role="switch" aria-checked="true" aria-labelledby="icons-label"></button>
        </div>
        <h3 class="arch-heading">Backup</h3>
        <p class="setting-note">Your notes live only on this device. A backup is a file you can keep somewhere safe and bring back later. Save it to Files or Drive, in a folder called FindNotes, so it is easy to find.</p>
