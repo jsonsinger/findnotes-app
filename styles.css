@@ -88,6 +88,28 @@
 html, body { overscroll-behavior: none; overflow: hidden; height: 100%; }
 
 /* The icon sprite at the top of index.html takes no space */
+:root {
+  accent-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input:focus,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.title-input:focus,
+.title-input:focus-visible,
+.search-input:focus,
+.search-input:focus-visible {
+  outline: 0;
+}
+
 .sprite { position: absolute; }
 
 #item-title, #item-body { scrollbar-width: none; }
@@ -137,7 +159,7 @@ h1, h2 {
   flex: 1;
   min-width: 0;
   font-size: 22px;
-  font-weight: 500;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -165,7 +187,11 @@ h1, h2 {
 }
 
 .header h1 {
-  color: var(--text-muted);
+  color: var(--text);
+}
+
+.header .icon-btn {
+  color: var(--text);
 }
 
 .tile {
@@ -326,6 +352,7 @@ h1, h2 {
 /* One item in the list */
 .row {
   position: relative;
+  isolation: isolate; /* keeps the selected row's yellow (::before) above the list, below the text */
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -338,8 +365,6 @@ h1, h2 {
 
 /* Long-press selects a row. A selected row has a gold circle and a lighter background. */
 .row.selected {
-  background: var(--accent-soft);
-  border-radius: 12px;
   border-top-color: transparent;
   margin: 0 8px;
   padding-left: 0;
@@ -348,6 +373,15 @@ h1, h2 {
 
 .row.selected + .row {
   border-top-color: transparent;
+}
+
+.row.selected::before {
+  content: '';
+  position: absolute;
+  inset: 2px 0;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  z-index: -1;
 }
 
 .row.selected .circle {
@@ -486,10 +520,10 @@ h1, h2 {
 }
 
 .circle {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
+  border: 1.8px solid var(--text-muted);
   display: grid;
   place-items: center;
   color: var(--text-muted);
@@ -503,7 +537,9 @@ h1, h2 {
 }
 
 .row.done .circle {
-  border-color: var(--line);
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .row.done .circle .icon {
@@ -518,8 +554,9 @@ h1, h2 {
 
 .row-title {
   display: block;
-  font-size: 16px;
-  line-height: 1.35;
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .row.done .row-title {
@@ -959,59 +996,89 @@ h1, h2 {
 /* Tapping the list name opens this: rename or pick an icon */
 .listedit {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
-  left: 12px;
-  right: 12px;
-  padding: 14px 14px 6px;
-  background: var(--popover-bg);
-  border: 0.5px solid var(--line-strong);
+  top: calc(env(safe-area-inset-top, 0px) + 100px);
+  left: 16px;
+  right: 16px;
+  padding: 18px 16px 16px;
+  background: var(--surface);
+  border: 0;
   border-radius: 16px;
   box-shadow: var(--shadow-popover);
   z-index: 8;
 }
 
+.listedit-title {
+  font-size: 19px;
+  font-weight: 700;
+}
+
 .title-input {
   display: block;
   width: 100%;
+  height: 48px;
+  margin-top: 12px;
+  padding: 0 14px;
   font: inherit;
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 16px;
   color: var(--text);
-  background: none;
-  border: 0;
-  border-bottom: 1.5px solid var(--accent);
-  border-radius: 0;
+  background: var(--bg);
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
   outline: 0;
-  padding: 0 0 6px;
+}
+
+.listedit-label {
+  padding: 16px 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .icon-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
-  margin: 14px 0 8px;
-  justify-items: center;
 }
 
 .icon-grid button {
-  width: 48px;
-  height: 48px;
+  aspect-ratio: 1;
   border-radius: 9px;
   display: grid;
   place-items: center;
-  color: var(--text-muted);
-  background: var(--tile-bg);
-  border: 1.5px solid transparent;
+  color: var(--text);
+  background: var(--bg);
 }
 
 .icon-grid button[aria-checked='true'] {
-  color: var(--tile-text);
-  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .icon-grid .icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+}
+
+.listedit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.listedit-actions .setting-btn {
+  min-height: 40px;
+  padding: 0 18px;
+  background: var(--bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.listedit-actions .setting-btn.go {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Three-dots menu */
@@ -1048,6 +1115,29 @@ h1, h2 {
   width: 20px;
   height: 20px;
   color: var(--text-muted);
+}
+
+.menu {
+  padding: 6px;
+}
+
+.menu button {
+  border-radius: 8px;
+  padding: 0 12px;
+  font-weight: 600;
+}
+
+.menu button:not(:disabled):is(:active, :focus-visible) {
+  outline: 0;
+  background: var(--accent-soft);
+}
+
+.menu button:not(:disabled):is(:active, :focus-visible) .icon {
+  color: var(--accent-text);
+}
+
+.menu hr {
+  margin: 5px 8px;
 }
 
 .menu hr {
@@ -1127,27 +1217,30 @@ h1, h2 {
 
 .dot {
   flex: none;
-  width: 12px;
+  width: 13px; /* DOT_W in app.js */
   height: 28px;
   display: grid;
   place-items: center;
+  transition: width 220ms ease-out;
 }
 
 .dot::before {
   content: '';
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  opacity: 0.5;
-  transition: width 220ms ease-out, height 220ms ease-out, opacity 220ms ease-out, background-color 220ms ease-out;
+  border-radius: 3px;
+  background: var(--line-strong);
+  transition: width 220ms ease-out, height 220ms ease-out, background-color 220ms ease-out;
+}
+
+/* The current list: a gold pill, its slot wider by DOT_EXTRA in app.js */
+.dot[aria-current='true'] {
+  width: 25px;
 }
 
 .dot[aria-current='true']::before {
-  width: 8px;
-  height: 8px;
-  background: var(--text);
-  opacity: 1;
+  width: 18px;
+  background: var(--accent);
 }
 
 .dot.edge::before {
@@ -1211,7 +1304,7 @@ h1, h2 {
   min-height: 64px;
   padding: 0 8px 0 20px;
   /* Clear edges, so picked rows next to each other show a gap without anything moving */
-  border-block: 3px solid transparent;
+  border-block: 2px solid transparent;
   background-clip: padding-box;
   user-select: none;
   -webkit-user-select: none;
@@ -1233,6 +1326,20 @@ h1, h2 {
 }
 
 .arch-name { font-size: 17px; }
+
+.arch-row [data-act='restore'] {
+  width: 38px;
+  height: 38px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent-text);
+}
+
+.arch-row [data-act='restore'] .icon {
+  width: 19px;
+  height: 19px;
+}
 .arch-sub { font-size: 13px; color: var(--text-muted); }
 
 /* Picking rows in the archive: a circle takes the icon's place on every row (so the text
@@ -1264,7 +1371,7 @@ h1, h2 {
 .arch-row.picked {
   margin: 0 8px;
   padding-left: 12px;
-  border-radius: 15px; /* 12px, plus the clear edge */
+  border-radius: 14px; /* 12px, plus the clear edge */
   background-color: var(--accent-soft);
 }
 
@@ -1728,7 +1835,8 @@ h1, h2 {
 /* Dashed rules between rows */
 [data-style='sketch'] .row { border-top: 2px dashed var(--line); }
 [data-style='sketch'] :is(.row.selected, .row.selected + .row) { border-top-color: transparent; }
-[data-style='sketch'] :is(.row.selected, .arch-row.picked) { border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px; }
+[data-style='sketch'] .row.selected::before,
+[data-style='sketch'] .arch-row.picked { border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px; }
 
 /* A ticked item is crossed out with a pen line, not a font strike */
 [data-style='sketch'] .row.done .row-title {
@@ -1780,3 +1888,13 @@ h1, h2 {
 [data-style='sketch'] .group .setting:last-child { border-bottom: 0; }
 [data-style='sketch'] .group-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
 [data-style='sketch'] .group .days { border-radius: var(--wobble-sm); }
+
+[data-style='sketch'] .listedit-title { font-family: var(--hand); font-size: 30px; line-height: 1; }
+[data-style='sketch'] .title-input { border: var(--ink-line); border-radius: var(--wobble-sm); font-family: var(--hand); font-size: 25px; }
+[data-style='sketch'] .listedit-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .icon-grid button { background: var(--surface); }
+[data-style='sketch'] .icon-grid button[aria-checked='true'] { background: var(--accent); }
+[data-style='sketch'] .listedit-actions .setting-btn { background: var(--surface); }
+[data-style='sketch'] .listedit-actions .setting-btn.go { background: var(--accent); }
+[data-style='sketch'] .arch-row [data-act='restore'] { border: var(--ink-line); border-radius: var(--wobble-round); background: var(--surface); color: var(--ink); }
+[data-style='sketch'] .dot[aria-current='true']::before { border-radius: 4px; background: var(--accent); border-color: var(--ink); }

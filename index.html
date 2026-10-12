@@ -238,9 +238,15 @@
    </div>
 
    <div class="menu-scrim" id="edit-scrim" hidden></div>
-   <div class="listedit" id="listedit" role="dialog" aria-label="Edit list" hidden>
-     <input class="title-input" id="title-input" type="text" maxlength="40" aria-label="List name" autocomplete="off" enterkeyhint="done">
+   <div class="listedit" id="listedit" role="dialog" aria-labelledby="listedit-title" hidden>
+     <h3 class="listedit-title" id="listedit-title">Edit list</h3>
+     <input class="title-input" id="title-input" type="text" maxlength="40" placeholder="List name" aria-label="List name" autocomplete="off" enterkeyhint="done">
+     <div class="listedit-label">Icon</div>
      <div class="icon-grid" id="icon-grid" role="radiogroup" aria-label="List icon"></div>
+     <div class="listedit-actions">
+       <button class="setting-btn" id="listedit-cancel">Cancel</button>
+       <button class="setting-btn go" id="listedit-save">Save</button>
+     </div>
    </div>
 
    <section class="screen" id="all-lists" role="dialog" aria-modal="true" aria-label="All lists" hidden>

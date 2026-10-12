@@ -13,6 +13,9 @@ const el = {
   listEdit: $('listedit'),
   editScrim: $('edit-scrim'),
   iconGrid: $('icon-grid'),
+  listEditTitle: $('listedit-title'),
+  listEditCancel: $('listedit-cancel'),
+  listEditSave: $('listedit-save'),
   listbar: $('listbar'),
   listbarHint: $('listbar-hint'),
   listbarX: $('listbar-x'),
@@ -1064,6 +1067,7 @@ function closeMenu() {
 }
 
 el.menuBtn.addEventListener('click', openMenu);
+el.menu.addEventListener('touchstart', () => {}, { passive: true }); // lets iOS show :active on the item you touch
 el.menuScrim.addEventListener('click', closeMenu);
 
 el.menu.addEventListener('click', (e) => {
@@ -1118,17 +1122,11 @@ el.allNew.addEventListener('click', () => {
 
 /* ---------- new, rename and delete a list ---------- */
 
-function newList() {
-  const last = state.lists[state.lists.length - 1];
-  const list = { id: db.uid(), name: 'New list', icon: 'list', order: last ? last.order + 1 : 0 };
-  state.lists.push(list);
-  save(db.put('lists', list));
-  switchTo(list.id);
-  startRename(); // a new list almost always needs a name
-}
+// New list opens the same card as Edit list. Nothing is made until you tap Save.
+const newList = () => startRename('new');
 
-// Tapping the list name opens a small panel: name and icon.
-let renaming = false;
+// Tapping the list name (or Edit list) opens a card: name and icon, then Cancel or Save.
+let renaming = null; // { mode: 'edit' | 'new', icon } while the card is open
 
 function buildIconGrid() {
   el.iconGrid.replaceChildren(...LIST_ICONS.map((name) => {
@@ -1141,31 +1139,40 @@ function buildIconGrid() {
 }
 
 function markIcon() {
-  const current = iconOf(currentList());
-  for (const b of el.iconGrid.children) b.setAttribute('aria-checked', String(b.dataset.icon === current));
+  for (const b of el.iconGrid.children) b.setAttribute('aria-checked', String(b.dataset.icon === renaming?.icon));
 }
 
-function startRename() {
+function startRename(mode = 'edit') {
   if (renaming) return;
-  renaming = true;
+  const list = currentList();
+  renaming = { mode, icon: mode === 'new' ? 'list' : iconOf(list) };
   if (!el.iconGrid.children.length) buildIconGrid();
   markIcon();
   lockBackground();
+  el.listEditTitle.textContent = mode === 'new' ? 'New list' : 'Edit list';
   el.listEdit.hidden = false;
   el.editScrim.hidden = false;
-  el.titleInput.value = currentList().name;
+  el.titleInput.value = mode === 'new' ? '' : list.name;
   el.titleInput.focus();
   el.titleInput.select();
 }
 
 function finishRename(keep) {
   if (!renaming) return;
-  renaming = false;
+  const { mode, icon } = renaming;
+  renaming = null;
 
-  const list = currentList();
   const name = el.titleInput.value.trim();
-  if (keep && name && name !== list.name) {
-    list.name = name;
+  let created = null;
+  if (keep && mode === 'new') {
+    const last = state.lists[state.lists.length - 1];
+    created = { id: db.uid(), name: name || 'New list', icon, order: last ? last.order + 1 : 0 };
+    state.lists.push(created);
+    save(db.put('lists', created));
+  } else if (keep) {
+    const list = currentList();
+    if (name) list.name = name;
+    list.icon = icon;
     save(db.put('lists', list));
   }
   el.listEdit.hidden = true;
@@ -1173,25 +1180,24 @@ function finishRename(keep) {
   el.titleInput.blur();
   unlockBackground();
   restoreFocus();
-  render();
+  if (created) switchTo(created.id); else render();
 }
 
 el.who.addEventListener('click', () => { if (!animating) startRename(); });
-el.editScrim.addEventListener('click', () => finishRename(true));
+el.editScrim.addEventListener('click', () => finishRename(false));
+el.listEditCancel.addEventListener('click', () => finishRename(false));
+el.listEditSave.addEventListener('click', () => finishRename(true));
 el.titleInput.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   e.preventDefault(); // otherwise the Enter lands on the name button we hand focus back to
   finishRename(true);
 });
 
-// An icon applies straight away, so you see it in the header behind the panel.
+// The icon you pick is kept until Save.
 el.iconGrid.addEventListener('click', (e) => {
   const icon = e.target.closest('button')?.dataset.icon;
-  if (!icon) return;
-  const list = currentList();
-  list.icon = icon;
-  save(db.put('lists', list));
-  el.tileIcon.setAttribute('href', iconHref(list));
+  if (!icon || !renaming) return;
+  renaming.icon = icon;
   markIcon();
 });
 
@@ -1551,7 +1557,8 @@ const MAX_DOTS = 5; // more lists than this: a window of five dots that follows 
 
 const currentIndex = () => state.lists.findIndex((l) => l.id === state.currentId);
 
-const DOT_W = 12; // px, the width of one .dot
+const DOT_W = 13; // px, the width of one .dot
+const DOT_EXTRA = 12; // px, how much wider the current list's dot (a pill) is than the rest
 let dotsKey = ''; // which lists the dots were built for
 
 function renderDots() {
@@ -1577,7 +1584,7 @@ function renderDots() {
       return dot;
     }));
     el.dots.replaceChildren(track);
-    el.dots.style.width = `${Math.min(n, MAX_DOTS) * DOT_W}px`;
+    el.dots.style.width = `${Math.min(n, MAX_DOTS) * DOT_W + DOT_EXTRA}px`;
     if (first) { // the first time they just appear
       el.dots.classList.add('still');
       requestAnimationFrame(() => requestAnimationFrame(() => el.dots.classList.remove('still')));
