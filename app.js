@@ -43,6 +43,15 @@ const el = {
   archive: $('archive'),
   archiveBody: $('archive-body'),
   archiveBack: $('archive-back'),
+  archbar: $('archbar'),
+  archRestore: $('arch-restore'),
+  archDelete: $('arch-delete'),
+  restorebar: $('restorebar'),
+  restorebarHint: $('restorebar-hint'),
+  restorebarX: $('restorebar-x'),
+  deletebar: $('deletebar'),
+  deletebarHint: $('deletebar-hint'),
+  deletebarX: $('deletebar-x'),
   search: $('search'),
   searchBack: $('search-back'),
   searchInput: $('search-input'),
@@ -63,6 +72,12 @@ const el = {
   themeSeg: $('theme-seg'),
   iconsSwitch: $('icons-switch'),
   version: $('version'),
+  counts: $('counts'),
+  cleanupSwitch: $('cleanup-switch'),
+  cleanupDays: $('cleanup-days'),
+  cleanupbar: $('cleanupbar'),
+  cleanupbarHint: $('cleanupbar-hint'),
+  cleanupbarX: $('cleanupbar-x'),
   backupStatus: $('backup-status'),
   persistStatus: $('persist-status'),
   resetBtn: $('reset-btn'),
@@ -166,7 +181,7 @@ function saveEverything() {
 // data, so it lives in localStorage rather than IndexedDB (and not in exports).
 // The icons a list can have. Anything else (or nothing) falls back to the plain list icon,
 // which also means the name can never be used to smuggle odd text into an href.
-const LIST_ICONS = ['flame', 'compass', 'mountain', 'map', 'tent', 'anchor', 'moon', 'sun', 'leaf', 'star', 'heart', 'list'];
+const LIST_ICONS = ['list', 'map', 'compass', 'mountain', 'tent', 'anchor', 'leaf', 'star', 'heart', 'sun', 'moon', 'flame'];
 const iconOf = (list) => (LIST_ICONS.includes(list.icon) ? list.icon : 'list');
 const iconHref = (list) => `#i-${iconOf(list)}`;
 
@@ -242,21 +257,37 @@ function renderRow(item) {
   return row;
 }
 
-function renderEmpty(heading = 'A blank page', text = 'Add your first item below.') {
+// An empty list or archive: a big icon, a heading and a line of text. `icon` is always one of
+// ours (a list's icon goes through iconOf), so building the svg from a string is safe.
+function renderEmpty({ icon, heading, text, arrow = false }) {
   const box = document.createElement('div');
   box.className = 'empty';
+  const badge = document.createElement('span');
+  badge.className = 'empty-icon';
+  badge.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-${icon}"/></svg>`;
   const title = document.createElement('strong');
   title.textContent = heading;
   const hint = document.createElement('span');
   hint.textContent = text;
-  box.append(title, hint);
+  box.append(badge, title, hint);
+  // A hand-drawn arrow down to the add bar
+  if (arrow) box.insertAdjacentHTML('beforeend', '<svg class="empty-arrow" viewBox="0 0 24 34" aria-hidden="true"><path d="M12 2c-3 8 3 14 0 26M6 22l6 8 6-8"/></svg>');
   return box;
 }
+
+const blankPage = (list) => renderEmpty({
+  icon: list ? iconOf(list) : 'list',
+  heading: 'A blank page',
+  text: 'Add the first thing below. Tap any item later to turn it into a note.',
+  arrow: true,
+});
 
 // The rows of a list, or the blank-page message. `limit` keeps only the first few rows.
 function listContent(listId, limit = Infinity) {
   const items = itemsOf(listId);
-  return items.length ? items.slice(0, limit).map(renderRow) : [renderEmpty()];
+  return items.length
+    ? items.slice(0, limit).map(renderRow)
+    : [blankPage(state.lists.find((l) => l.id === listId))];
 }
 
 function render() {
@@ -682,6 +713,8 @@ const LAYERS = [
   { open: () => !el.listEdit.hidden, close: () => finishRename(false) },
   { open: () => !el.search.hidden, close: () => closeSearch() },
   { open: () => !el.resetbar.hidden, close: () => closeResetBar() },
+  { open: () => !el.cleanupbar.hidden, close: () => closeCleanupBar() },
+  { open: () => !el.archive.hidden && arch.mode !== 'idle', close: () => { if (arch.mode === 'pick') { arch.picks.clear(); setArchMode('idle'); } else archBack(); } },
   { open: () => !el.settings.hidden, close: () => closeSettings() },
   { open: () => !el.archive.hidden, close: () => closeArchive() },
   { open: () => !el.allLists.hidden, close: () => closeAll() },
@@ -1208,6 +1241,10 @@ function restoreList(list) {
 const listNameOf = (id) =>
   [...state.lists, ...state.archive.lists].find((l) => l.id === id)?.name ?? 'Deleted list';
 
+// Items archived along with a list live inside that list, so they aren't shown twice.
+const looseArchivedItems = () =>
+  state.archive.items.filter((i) => !i.archivedWith || !state.archive.lists.some((l) => l.id === i.archivedWith));
+
 function archiveRow(kind, record) {
   const row = fromTemplate('tpl-arch-row');
   row.dataset.kind = kind;
@@ -1217,21 +1254,19 @@ function archiveRow(kind, record) {
   const when = ago(record.archivedAt);
   if (kind === 'list') {
     const count = state.archive.items.filter((i) => i.archivedWith === record.id).length;
-    row.querySelector('use').setAttribute('href', iconHref(record));
-    row.querySelector('.arch-sub').textContent = `${count} ${count === 1 ? 'item' : 'items'} \u00b7 archived ${when}`;
+    row.querySelector('.tile use').setAttribute('href', iconHref(record));
+    row.querySelector('.arch-sub').textContent = `${count} ${count === 1 ? 'item' : 'items'} · archived ${when}`;
   } else {
-    row.querySelector('use').setAttribute('href', '#i-note');
-    row.querySelector('.arch-sub').textContent = `${listNameOf(record.listId)} \u00b7 archived ${when}`;
+    row.querySelector('.tile use').setAttribute('href', '#i-note');
+    row.querySelector('.arch-sub').textContent = `${listNameOf(record.listId)} · archived ${when}`;
   }
   row.querySelector('[data-act="restore"]').setAttribute('aria-label', `Restore ${name}`);
-  row.querySelector('[data-act="delete"]').setAttribute('aria-label', `Delete ${name} permanently`);
   return row;
 }
 
 function renderArchive() {
   const lists = state.archive.lists;
-  // Items archived along with a list live inside that list, so they aren't shown twice.
-  const items = state.archive.items.filter((i) => !i.archivedWith || !lists.some((l) => l.id === i.archivedWith));
+  const items = looseArchivedItems();
   const nodes = [];
   const heading = (text) => {
     const h = document.createElement('div');
@@ -1241,14 +1276,20 @@ function renderArchive() {
   };
   if (lists.length) nodes.push(heading('Lists'), ...lists.map((l) => archiveRow('list', l)));
   if (items.length) nodes.push(heading('Items'), ...items.map((i) => archiveRow('item', i)));
+  el.archbar.hidden = !nodes.length;
   if (!nodes.length) {
-    nodes.push(renderEmpty('Nothing archived', 'Lists and items you archive wait here.'));
+    nodes.push(renderEmpty({ icon: 'box', heading: 'Nothing archived', text: 'Lists and items you archive wait here, ready to restore.' }));
   }
   el.archiveBody.replaceChildren(...nodes);
+  markArchRows();
 }
 
 function openArchive() {
+  cleanUpArchive();
+  arch.picks.clear();
+  arch.one = null;
   renderArchive();
+  setArchMode('idle');
   showScreen(el.archive, el.archiveBack);
 }
 
@@ -1256,52 +1297,189 @@ const closeArchive = () => hideScreen(el.archive);
 
 el.archiveBack.addEventListener('click', closeArchive);
 
-// Deleting for good is asked twice: the bin turns into "Delete" for a few seconds.
-let sureTimer = 0;
-function disarm() {
-  clearTimeout(sureTimer);
-  el.archiveBody.querySelectorAll('.sure').forEach((b) => {
-    b.classList.remove('sure');
-    b.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>';
-  });
+// Rows are known by "kind:id", so a list and an item can't be mixed up.
+const keyOf = (row) => `${row.dataset.kind}:${row.dataset.id}`;
+const splitKey = (key) => [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
+
+// What the archive is doing:
+//   idle     tap a restore button, or press and hold to pick rows
+//   pick     rows are picked; the bar offers Restore N and Delete N
+//   restore  a slide to restore one row (`one`) or the picked rows
+//   delete   a red slide, twice, to delete the picked rows for good
+const arch = { mode: 'idle', picks: new Set(), one: null };
+let deleteArmed = false;
+
+function markArchRows() {
+  for (const row of el.archiveBody.querySelectorAll('.arch-row')) {
+    const key = keyOf(row);
+    row.classList.toggle('picked', arch.picks.has(key) || arch.one === key);
+    row.style.opacity = '';
+  }
 }
 
-el.archiveBody.addEventListener('click', (e) => {
-  const button = e.target.closest('button[data-act]');
-  const row = e.target.closest('.arch-row');
-  if (!button || !row) return;
-  const { kind, id } = row.dataset;
+function setArchMode(mode) {
+  arch.mode = mode;
+  el.archive.dataset.mode = mode;
+  el.archbar.dataset.mode = mode;
+  const n = arch.picks.size;
+  el.archRestore.lastElementChild.textContent = `Restore ${n}`;
+  el.archDelete.lastElementChild.textContent = `Delete ${n}`;
+  const restoring = arch.one ? 1 : n;
+  el.restorebarHint.textContent = restoring === 1 ? 'Slide to restore' : `Slide to restore ${restoring}`;
+  deleteArmed = false;
+  el.deletebar.classList.remove('final');
+  el.deletebarHint.textContent = `Slide to delete ${n}`;
+  markArchRows();
+}
 
-  if (button.dataset.act === 'restore') {
+// Leaving a slide goes back to the picked rows, or to nothing picked.
+const archBack = () => {
+  arch.one = null;
+  setArchMode(arch.picks.size ? 'pick' : 'idle');
+};
+
+function togglePick(key) {
+  arch.one = null;
+  if (arch.picks.has(key)) arch.picks.delete(key); else arch.picks.add(key);
+  setArchMode(arch.picks.size ? 'pick' : 'idle');
+}
+
+function restoreKeys(keys) {
+  let n = 0;
+  for (const [kind, id] of keys.map(splitKey)) {
     if (kind === 'list') {
-      restoreList(state.archive.lists.find((l) => l.id === id));
+      const list = state.archive.lists.find((l) => l.id === id);
+      if (list) { restoreList(list); n++; }
     } else {
-      restoreItem(state.archive.items.find((i) => i.id === id));
+      const item = state.archive.items.find((i) => i.id === id);
+      if (item) { restoreItem(item); n++; }
     }
-    renderArchive();
-    showToast(kind === 'list' ? 'List restored' : 'Item restored');
-    return;
   }
+  return n;
+}
 
-  if (!button.classList.contains('sure')) {
-    disarm();
-    button.classList.add('sure');
-    button.textContent = 'Delete';
-    sureTimer = setTimeout(disarm, 3000);
+// Gone for good, in one transaction. A list takes the items archived with it.
+function deleteForGood(keys) {
+  const remove = [];
+  for (const [kind, id] of keys.map(splitKey)) {
+    if (kind === 'list') {
+      const items = state.archive.items.filter((i) => i.archivedWith === id);
+      state.archive.lists = state.archive.lists.filter((l) => l.id !== id);
+      state.archive.items = state.archive.items.filter((i) => i.archivedWith !== id);
+      remove.push(['lists', id], ...items.map((i) => ['items', i.id]));
+    } else {
+      state.archive.items = state.archive.items.filter((i) => i.id !== id);
+      remove.push(['items', id]);
+    }
+  }
+  if (remove.length) save(db.batch({ remove }));
+  return keys.length;
+}
+
+function finishArch(message) {
+  arch.picks.clear();
+  arch.one = null;
+  renderArchive();
+  setArchMode('idle');
+  showToast(message);
+}
+
+el.archRestore.addEventListener('click', () => setArchMode('restore'));
+el.archDelete.addEventListener('click', () => setArchMode('delete'));
+el.restorebarX.addEventListener('click', archBack);
+el.deletebarX.addEventListener('click', archBack);
+
+// The picked rows fade as you slide, as they do when archiving.
+const fadePicked = (p) => {
+  el.archiveBody.querySelectorAll('.arch-row.picked').forEach((r) => { r.style.opacity = p ? String(1 - 0.85 * p) : ''; });
+};
+
+makeSlider(el.restorebar, () => {
+  const n = restoreKeys(arch.one ? [arch.one] : [...arch.picks]);
+  finishArch(n === 1 ? 'Restored' : `${n} restored`);
+}, fadePicked);
+
+makeSlider(el.deletebar, () => {
+  if (!deleteArmed) {
+    deleteArmed = true;
+    el.deletebar.classList.add('final');
+    el.deletebarHint.textContent = 'Again. No undo';
     return;
   }
-  clearTimeout(sureTimer);
-  if (kind === 'list') {
-    const items = state.archive.items.filter((i) => i.archivedWith === id);
-    state.archive.lists = state.archive.lists.filter((l) => l.id !== id);
-    state.archive.items = state.archive.items.filter((i) => i.archivedWith !== id);
-    save(db.batch({ remove: [['lists', id], ...items.map((i) => ['items', i.id])] }));
-  } else {
-    state.archive.items = state.archive.items.filter((i) => i.id !== id);
-    save(db.remove('items', id));
+  const n = deleteForGood([...arch.picks]);
+  finishArch(n === 1 ? 'Deleted for good' : `${n} deleted for good`);
+}, fadePicked);
+
+// Tap a row's restore button for a slide that restores just that row.
+// While rows are picked, a tap picks or unpicks a row.
+let archHold = null; // { id, x, y, timer }
+let archHeld = false;
+
+el.archiveBody.addEventListener('click', (e) => {
+  const row = e.target.closest('.arch-row');
+  if (!row) return;
+  if (archHeld) { archHeld = false; return; } // the finger lifting after a hold
+  if (arch.mode === 'pick') { togglePick(keyOf(row)); return; }
+  if (e.target.closest('[data-act="restore"]') && (arch.mode === 'idle' || (arch.mode === 'restore' && arch.one))) {
+    arch.one = keyOf(row);
+    setArchMode('restore');
   }
-  renderArchive();
 });
+
+function cancelArchHold() {
+  if (!archHold) return;
+  clearTimeout(archHold.timer);
+  archHold = null;
+}
+
+el.archiveBody.addEventListener('pointerdown', (e) => {
+  const row = e.target.closest('.arch-row');
+  if (!row || e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (arch.mode === 'delete' || (arch.mode === 'restore' && !arch.one)) return;
+  cancelArchHold();
+  archHeld = false;
+  archHold = { id: e.pointerId, x: e.clientX, y: e.clientY, timer: 0 };
+  archHold.timer = setTimeout(() => {
+    archHold = null;
+    archHeld = true;
+    navigator.vibrate?.(12);
+    togglePick(keyOf(row));
+  }, HOLD_MS);
+});
+el.archiveBody.addEventListener('pointermove', (e) => {
+  if (archHold && e.pointerId === archHold.id && Math.hypot(e.clientX - archHold.x, e.clientY - archHold.y) > HOLD_SLOP) cancelArchHold();
+});
+el.archiveBody.addEventListener('pointerup', cancelArchHold);
+el.archiveBody.addEventListener('pointercancel', cancelArchHold);
+el.archiveBody.addEventListener('contextmenu', (e) => { if (e.target.closest('.arch-row')) e.preventDefault(); });
+
+/* ---------- auto clean-up: archived things go for good after N days ---------- */
+
+const CLEANUP_KEY = 'find-notes:cleanup';           // 'on' when switched on
+const CLEANUP_DAYS_KEY = 'find-notes:cleanup-days'; // 1 to 999, 30 if never set
+const DAY_MS = 24 * 60 * 60 * 1000;
+const clampDays = (n) => (Number.isFinite(n) ? Math.min(999, Math.max(1, Math.round(n))) : 30);
+
+function readSetting(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function writeSetting(key, value) {
+  try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* storage blocked */ }
+}
+
+let cleanupOn = readSetting(CLEANUP_KEY) === 'on';
+let cleanupDays = clampDays(parseInt(readSetting(CLEANUP_DAYS_KEY) ?? '30', 10));
+
+// Runs when the app opens and when the archive opens, never while you type the number.
+function cleanUpArchive() {
+  if (!cleanupOn) return;
+  const cutoff = Date.now() - cleanupDays * DAY_MS;
+  const old = (record) => record.archivedAt && record.archivedAt < cutoff;
+  deleteForGood([
+    ...state.archive.lists.filter(old).map((l) => `list:${l.id}`),
+    ...looseArchivedItems().filter(old).map((i) => `item:${i.id}`),
+  ]);
+}
 
 /* ---------- the dots ---------- */
 
@@ -1946,8 +2124,21 @@ function askToPersist() {
   navigator.storage?.persist?.().then((ok) => { persisted = ok; }, () => {});
 }
 
+function countText() {
+  const n = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+  const archived = state.archive.lists.length + looseArchivedItems().length;
+  return `${n(state.lists.length, 'list')} · ${n(state.items.length, 'item')} · ${archived} archived`;
+}
+
+function markCleanup() {
+  el.cleanupSwitch.setAttribute('aria-checked', String(cleanupOn));
+  el.cleanupDays.value = String(cleanupDays);
+}
+
 function openSettings() {
   markTheme();
+  markCleanup();
+  el.counts.textContent = countText();
   appVersion().then((v) => { el.version.textContent = v; });
   el.backupStatus.textContent = '';
   const ask = navigator.storage?.persisted?.();
@@ -1960,6 +2151,7 @@ function openSettings() {
 function closeSettings() {
   disarmImport();
   closeResetBar();
+  closeCleanupBar();
   hideScreen(el.settings);
 }
 el.settingsBack.addEventListener('click', closeSettings);
@@ -1968,6 +2160,7 @@ el.settingsBack.addEventListener('click', closeSettings);
 // slides, the second one after the bar has said plainly what will happen.
 let resetArmed = false;
 function openResetBar() {
+  closeCleanupBar();
   resetArmed = false;
   el.resetbar.classList.remove('final');
   el.resetbarHint.textContent = 'Delete everything';
@@ -1978,6 +2171,46 @@ function closeResetBar() {
   resetArmed = false;
 }
 el.resetBtn.addEventListener('click', openResetBar);
+
+// Auto clean-up deletes for good, so turning it on takes two slides. Turning it off is one tap.
+let cleanupArmed = false;
+function openCleanupBar() {
+  closeResetBar();
+  cleanupArmed = false;
+  el.cleanupbar.classList.remove('final');
+  el.cleanupbarHint.textContent = `After ${cleanupDays} ${cleanupDays === 1 ? 'day' : 'days'}`;
+  el.cleanupbar.hidden = false;
+}
+function closeCleanupBar() {
+  el.cleanupbar.hidden = true;
+  cleanupArmed = false;
+}
+el.cleanupbarX.addEventListener('click', closeCleanupBar);
+makeSlider(el.cleanupbar, () => {
+  if (!cleanupArmed) {
+    cleanupArmed = true;
+    el.cleanupbar.classList.add('final');
+    el.cleanupbarHint.textContent = 'Again. Deletes for good';
+    return;
+  }
+  closeCleanupBar();
+  cleanupOn = true;
+  writeSetting(CLEANUP_KEY, 'on');
+  markCleanup();
+  showToast(`Archived things go after ${cleanupDays} ${cleanupDays === 1 ? 'day' : 'days'}`);
+});
+el.cleanupSwitch.addEventListener('click', () => {
+  if (!cleanupOn) { openCleanupBar(); return; }
+  cleanupOn = false;
+  writeSetting(CLEANUP_KEY, null);
+  markCleanup();
+});
+el.cleanupDays.addEventListener('change', () => {
+  cleanupDays = clampDays(parseInt(el.cleanupDays.value, 10));
+  writeSetting(CLEANUP_DAYS_KEY, String(cleanupDays));
+  markCleanup();
+  if (!el.cleanupbar.hidden) openCleanupBar(); // the bar names the days, so start it again
+});
 el.resetbarX.addEventListener('click', closeResetBar);
 makeSlider(el.resetbar, async () => {
   if (!resetArmed) {
@@ -2222,6 +2455,8 @@ async function init() {
     // A toast, not a banner that can't be closed: Settings > Storage says so too, and can reset it.
     showToast("Can't save notes on this device. Settings > Storage can reset it.", null, 8000);
   }
+
+  if (!memoryOnly) cleanUpArchive();
 
   const remembered = recallList();
   state.currentId = state.lists.some((l) => l.id === remembered)

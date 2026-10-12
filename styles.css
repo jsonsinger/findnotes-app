@@ -259,13 +259,52 @@ h1, h2 {
 }
 
 .empty strong {
-  font-size: 17px;
-  font-weight: 500;
+  margin-top: 6px;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 
-.empty span {
-  font-size: 14px;
-  opacity: 0.75;
+.empty > span:not(.empty-icon) {
+  max-width: 280px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* The big icon on an empty list or archive */
+.empty-icon {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--accent-text);
+}
+
+:root[data-theme='light'] .empty-icon {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.empty-icon .icon {
+  width: 42px;
+  height: 42px;
+  stroke-width: 1.6;
+}
+
+/* Points down at the add bar */
+.empty-arrow {
+  width: 28px;
+  height: 40px;
+  margin-top: 10px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
 }
 
 /* One item in the list */
@@ -957,7 +996,7 @@ h1, h2 {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 54px);
   right: 12px;
-  width: 200px;
+  width: 214px;
   padding: 6px 0;
   background: var(--popover-bg);
   border: 0.5px solid var(--line-strong);
@@ -967,11 +1006,19 @@ h1, h2 {
 }
 
 .menu button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
   min-height: 44px;
   padding: 0 16px;
   font-size: 16px;
+}
+
+.menu button .icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
 }
 
 .menu hr {
@@ -1134,6 +1181,9 @@ h1, h2 {
   gap: 12px;
   min-height: 64px;
   padding: 0 8px 0 20px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .arch-text {
@@ -1153,10 +1203,122 @@ h1, h2 {
 .arch-name { font-size: 17px; }
 .arch-sub { font-size: 13px; color: var(--text-muted); }
 
-.arch-row .icon-btn.sure {
-  width: auto;
-  padding: 0 12px;
-  font-size: 14px;
+/* Picking rows in the archive: a circle shows on every row, picked rows turn yellow,
+   and red when they are about to be deleted. */
+.arch-row .circle {
+  display: none;
+  flex: none;
+}
+
+#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row .circle,
+#archive[data-mode='restore'] .arch-row.picked .circle {
+  display: grid;
+}
+
+#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row [data-act='restore'],
+#archive[data-mode='restore'] .arch-row.picked [data-act='restore'] {
+  display: none;
+}
+
+.arch-row.picked {
+  margin: 0 8px;
+  padding-left: 12px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+
+.arch-row.picked + .arch-row.picked {
+  margin-top: 4px;
+}
+
+.arch-row.picked .circle {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.arch-row.picked .circle .icon {
+  display: block;
+}
+
+#archive[data-mode='delete'] .arch-row.picked {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+#archive[data-mode='delete'] .arch-row.picked .circle {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--bg);
+}
+
+#archive-body {
+  padding-bottom: 12px;
+}
+
+/* The archive's bottom bar: a hint, then Restore N and Delete N, then a slide */
+.archbar {
+  flex: none;
+  min-height: 56px;
+  margin: 8px 16px var(--bar-bottom);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archbar .selbar {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  flex: 1;
+  display: none;
+}
+
+.archbar[data-mode='restore'] #restorebar,
+.archbar[data-mode='delete'] #deletebar {
+  display: block;
+}
+
+.arch-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.archbar:not([data-mode='idle']) .arch-hint {
+  display: none;
+}
+
+.arch-pick {
+  flex: 1;
+  display: none;
+  gap: 8px;
+}
+
+.archbar[data-mode='pick'] .arch-pick {
+  display: flex;
+}
+
+.arch-btn {
+  flex: 1;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 14px;
+  background: var(--bar-bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.arch-btn .icon {
+  width: 19px;
+  height: 19px;
+  color: var(--accent-text);
+}
+
+.arch-btn.danger,
+.arch-btn.danger .icon {
   color: var(--danger);
 }
 
@@ -1204,18 +1366,44 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* Reset storage uses the archive slide, in red, and asks twice */
-#resetbar .sel-knob {
+/* A red slide, for deleting for good. Most ask twice; the second time the bar gets a red edge. */
+.selbar.danger .sel-knob {
   background: var(--danger);
   color: #fff;
 }
 
-#resetbar .sel-fill {
+:root:not([data-theme='light']) .selbar.danger .sel-knob {
+  color: var(--bg);
+}
+
+.selbar.danger .sel-fill {
   background: color-mix(in srgb, var(--danger) 22%, transparent);
 }
 
-#resetbar.final {
+.selbar.danger.final {
   box-shadow: inset 0 0 0 2px var(--danger);
+}
+
+/* The number of days for auto clean-up, typed straight into the sentence */
+.days {
+  width: 3.4em;
+  margin: 0 2px;
+  padding: 1px 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+
+.days::-webkit-inner-spin-button,
+.days::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* A label with a short explanation under it */
@@ -1263,7 +1451,8 @@ h1, h2 {
 /* Show icons off: no icon next to list names */
 .no-icons .who .tile,
 .no-icons .all-row .tile,
-.no-icons .arch-row .tile {
+.no-icons .arch-row .tile,
+.no-icons .menu button .icon {
   display: none;
 }
 
