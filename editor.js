@@ -7,7 +7,8 @@
 //   h3    smaller heading          ### text
 //   li    bullet                   - text
 //   task  tick box                 - [ ] text   /   - [x] text
-//   inline: **bold** and *italic*   (a literal * or \ is written as \* and \\)
+//   inline: **bold**, *italic* and ==highlight==   (a literal * or \ is written as \* and \\,
+//           and an = that could be read as part of == as \=)
 
 /* ---------- Markdown <-> blocks (no DOM needed for the plain-text helpers) ---------- */
 
@@ -25,7 +26,7 @@ export function parseLine(line) {
   return { type: 'p', text: line };
 }
 
-// Split text into pieces: plain text, and the bold / italic markers that really pair up.
+// Split text into pieces: plain text, and the bold / italic / highlight markers that really pair up.
 function tokens(text) {
   const raw = [];
   let buf = '';
@@ -38,13 +39,14 @@ function tokens(text) {
       if (text[i + 1] === '*') { raw.push({ t: 'b' }); i++; } else raw.push({ t: 'i' });
       continue;
     }
+    if (c === '=' && text[i + 1] === '=') { flush(); raw.push({ t: 'm' }); i++; continue; }
     buf += c;
   }
   flush();
   // A marker only counts if there is another one to close it. A lonely one is just text.
-  for (const kind of ['b', 'i']) {
+  for (const kind of ['b', 'i', 'm']) {
     const marks = raw.filter((x) => x.t === kind);
-    if (marks.length % 2) { const last = marks[marks.length - 1]; last.t = 'text'; last.v = kind === 'b' ? '**' : '*'; }
+    if (marks.length % 2) { const last = marks[marks.length - 1]; last.t = 'text'; last.v = { b: '**', i: '*', m: '==' }[kind]; }
   }
   return raw;
 }
@@ -56,7 +58,10 @@ export function plainLine(line) {
 }
 export const plainText = (md) => (md || '').split('\n').map(plainLine).join('\n');
 
-const escapeText = (s) => s.replace(/[\\*]/g, '\\$&');
+// An = is only escaped where it could join another = into a == marker: next to an =, or at
+// either end of a piece (where a marker may sit right beside it).
+const escapeText = (s) => s.replace(/[\\*]/g, '\\$&').replace(/=/g, (c, i, t) =>
+  (i === 0 || i === t.length - 1 || t[i - 1] === '=' || t[i + 1] === '=' ? '\\=' : c));
 
 /* ---------- the editor ---------- */
 
@@ -82,14 +87,16 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
 
   function inlineNodes(text) {
     const out = [];
-    let bold = false, italic = false;
+    let bold = false, italic = false, mark = false;
     for (const tok of tokens(text)) {
       if (tok.t === 'b') bold = !bold;
       else if (tok.t === 'i') italic = !italic;
+      else if (tok.t === 'm') mark = !mark;
       else {
         let node = document.createTextNode(tok.v);
         if (italic) { const i = document.createElement('i'); i.append(node); node = i; }
         if (bold) { const b = document.createElement('b'); b.append(node); node = b; }
+        if (mark) { const m = document.createElement('mark'); m.append(node); node = m; }
         out.push(node);
       }
     }
@@ -98,7 +105,7 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
 
   const tidy = (b) => {
     // Remove empty inline leftovers; an empty block keeps one <br> so it has a height and a caret.
-    for (const e of [...b.querySelectorAll('b, i, strong, em, span')]) {
+    for (const e of [...b.querySelectorAll('b, i, strong, em, span, mark')]) {
       if (!e.textContent && !e.querySelector('br')) e.remove();
     }
     for (const br of [...b.querySelectorAll('br')]) if (b.textContent || b.childNodes.length > 1) br.remove();
@@ -122,30 +129,32 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
   /* -- reading it back -- */
 
   const fmtOf = (node) => {
-    let bold = false, italic = false;
+    let bold = false, italic = false, mark = false;
     for (let n = node.parentNode; n && n !== root; n = n.parentNode) {
       if (n.nodeType !== 1) continue;
       if (n.classList.contains('b')) break;
       const tag = n.tagName;
       if (tag === 'B' || tag === 'STRONG' || /bold|[6-9]00/.test(n.style.fontWeight)) bold = true;
       if (tag === 'I' || tag === 'EM' || n.style.fontStyle === 'italic') italic = true;
+      if (tag === 'MARK') mark = true;
     }
-    return { bold, italic };
+    return { bold, italic, mark };
   };
 
   function inlineText(b) {
     let out = '';
     const open = [];
-    const close = () => { while (open.length) out += open.pop() === 'b' ? '**' : '*'; };
+    const MARKER = { b: '**', i: '*', m: '==' };
+    const close = () => { while (open.length) out += MARKER[open.pop()]; };
     const walk = (n) => {
       if (n.nodeType === 3) {
         const text = n.nodeValue.replace(/[ ​]/g, (c) => (c === ' ' ? ' ' : ''));
         if (!text) return;
-        const { bold, italic } = fmtOf(n);
-        const want = [bold && 'b', italic && 'i'].filter(Boolean);
+        const { bold, italic, mark } = fmtOf(n);
+        const want = [mark && 'm', bold && 'b', italic && 'i'].filter(Boolean);
         if (want.join() !== open.join()) {
           close();
-          for (const k of want) { out += k === 'b' ? '**' : '*'; open.push(k); }
+          for (const k of want) { out += MARKER[k]; open.push(k); }
         }
         out += escapeText(text);
       } else if (n.nodeType === 1 && n.tagName !== 'BR') {
@@ -423,8 +432,53 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
 
   function toggleInline(kind) {
     focus();
-    document.execCommand(kind === 'b' ? 'bold' : 'italic');
+    if (kind === 'm') toggleMark();
+    else document.execCommand(kind === 'b' ? 'bold' : 'italic');
     afterEdit();
+  }
+
+  // Highlighting is done by hand: the browser's own highlight command writes inline styles,
+  // which wouldn't save as ==text==. Works on a selection within one line.
+  function toggleMark() {
+    const sel = getSelection();
+    if (!sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    const block = closestBlock(r.startContainer);
+    if (!block || block !== closestBlock(r.endContainer)) return;
+    const insideMark = (node) => {
+      for (let n = node; n && n !== block; n = n.parentNode) if (n.nodeName === 'MARK') return n;
+      return null;
+    };
+    const outer = insideMark(r.startContainer);
+    if (r.collapsed) {
+      // A tap inside a highlight removes that whole highlight.
+      if (outer) { outer.replaceWith(...outer.childNodes); block.normalize(); }
+      return;
+    }
+    const frag = r.extractContents();
+    for (const m of [...frag.querySelectorAll('mark')]) m.replaceWith(...m.childNodes);
+    let piece;
+    if (outer) {
+      // Unhighlight the middle of a highlight: split it, and put the plain text between.
+      const tail = document.createRange();
+      tail.setStart(r.startContainer, r.startOffset);
+      tail.setEnd(outer, outer.childNodes.length);
+      const after = document.createElement('mark');
+      after.append(tail.extractContents());
+      piece = document.createElement('span');
+      piece.append(frag);
+      outer.after(piece, after);
+    } else {
+      piece = document.createElement('mark');
+      piece.append(frag);
+      r.insertNode(piece);
+    }
+    const chosen = document.createRange();
+    chosen.selectNodeContents(piece);
+    if (piece.nodeName === 'SPAN') { const kids = [...piece.childNodes]; piece.replaceWith(...kids); if (kids.length) { chosen.setStartBefore(kids[0]); chosen.setEndAfter(kids[kids.length - 1]); } }
+    sel.removeAllRanges();
+    sel.addRange(chosen);
+    tidy(block);
   }
 
   function state() {
@@ -433,10 +487,10 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     // Read bold and italic from the markup, not queryCommandState: Safari reports "bold" for
     // any text drawn heavy, so every heading lit up the B button.
     const at = getSelection().anchorNode;
-    const { bold, italic } = at && root.contains(at)
+    const { bold, italic, mark } = at && root.contains(at)
       ? fmtOf(at.nodeType === 3 ? at : { parentNode: at })
-      : { bold: false, italic: false };
-    return { type, bold, italic };
+      : { bold: false, italic: false, mark: false };
+    return { type, bold, italic, mark };
   }
 
   document.addEventListener('selectionchange', () => {

@@ -1,3 +1,19 @@
+/* Caveat and Karla are only for the Sketch style. Bundled (and saved for offline use by sw.js),
+   so nothing is fetched from elsewhere. Latin letters only, to keep them small. */
+@font-face {
+  font-family: 'Caveat';
+  src: url(fonts/Caveat.woff2) format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Karla';
+  src: url(fonts/Karla.woff2) format('woff2');
+  font-weight: 400 800;
+  font-display: swap;
+}
+
 /* Dark is the fallback; Settings > Theme picks Light, Dark or Auto (follow the phone).
    Dark: near-black with soft gold. Light: cool whites with a light yellow. */
 :root {
@@ -820,6 +836,19 @@ h1, h2 {
   height: 22px;
 }
 
+/* Highlighted text in a note, saved as ==text== */
+#item-body mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:root[data-theme='light'] #item-body mark {
+  background: rgba(249, 221, 122, 0.75);
+  color: inherit;
+}
+
 .fmt-h { font-weight: 600; }
 .fmt-h sub { font-size: 11px; vertical-align: baseline; position: relative; top: 3px; }
 .fmt-b { font-weight: 700; }
@@ -1551,3 +1580,137 @@ h1, h2 {
 #list.archiving[style*="opacity"] {
   transition: none;
 }
+
+
+/* ---------- Sketch: a hand-drawn look. Light only, white paper, inked outlines ----------
+   Caveat for anything you'd write by hand (titles, buttons, labels), Karla for reading. */
+:root[data-style='sketch'] {
+  --bg: #f8f8ff;
+  --surface: #ffffff;
+  --bar-bg: #ffffff;
+  --popover-bg: #ffffff;
+  --text: #2b2a26;
+  --text-muted: #55585f;
+  --accent: #f9dd7a;
+  --accent-soft: rgba(249, 221, 122, 0.6);
+  --accent-text: #2b2a26;
+  --on-accent: #2b2a26;
+  --bullet: #2b2a26;
+  --line: #c5c8d0;
+  --line-strong: #2b2a26;
+  --tile-bg: #ffffff;
+  --tile-text: #2b2a26;
+  --toast-bg: #2b2a26;
+  --ink: #2b2a26;
+  --ink-line: 2px solid var(--ink);
+  --hand: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive;
+  --wobble: 16px 12px 17px 13px / 13px 17px 12px 16px;
+  --wobble-sm: 10px 8px 11px 7px / 7px 11px 8px 10px;
+  --wobble-round: 52% 48% 50% 50% / 50% 52% 48% 50%;
+}
+
+[data-style='sketch'] body {
+  font-family: 'Karla', system-ui, sans-serif;
+}
+
+[data-style='sketch'] :is(h1, h2, .row-title, .addbar > span:first-child, .sel-label, .sel-hint, .arch-btn, .arch-hint,
+  .menu button, .all-name, .arch-name, .search-title, .setting > span:first-child, .setting-label, .setting-btn,
+  .seg button, .empty strong, #item-title, .title-input, #item-body .b.h, #item-body .b.h3, .arch-heading) {
+  font-family: var(--hand);
+}
+
+/* Caveat is small for its size, so the hand-written bits go up a few sizes */
+[data-style='sketch'] :is(h1, h2) { font-size: 32px; font-weight: 700; color: var(--text); }
+[data-style='sketch'] .row-title { font-size: 24px; font-weight: 600; line-height: 1.1; }
+[data-style='sketch'] .addbar { font-size: 24px; }
+[data-style='sketch'] :is(.menu button, .setting > span:first-child, .setting-label) { font-size: 22px; font-weight: 600; }
+[data-style='sketch'] .setting-label small { font-family: 'Karla', system-ui, sans-serif; font-weight: 400; }
+[data-style='sketch'] :is(.all-name, .arch-name, .search-title) { font-size: 23px; font-weight: 600; }
+[data-style='sketch'] :is(.setting-btn, .arch-btn, .seg button, .sel-label) { font-size: 21px; font-weight: 600; }
+[data-style='sketch'] :is(.sel-hint, .arch-hint) { font-size: 19px; }
+[data-style='sketch'] .arch-heading { font-size: 21px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .empty strong { font-size: 34px; line-height: 0.95; }
+[data-style='sketch'] #item-title { font-size: 36px; line-height: 1; }
+[data-style='sketch'] .title-input { font-size: 28px; }
+[data-style='sketch'] #item-body .b.h { font-size: 28px; line-height: 1.1; }
+[data-style='sketch'] #item-body .b.h3 { font-size: 23px; }
+
+/* Inked outlines and wobbly corners */
+[data-style='sketch'] :is(.tile, .addbar, .selbar, .menu, .listedit, .fmtbar, .setting-btn, .seg, .search-input,
+  .arch-btn, .empty-icon, .toast) {
+  border: var(--ink-line);
+  border-radius: var(--wobble);
+}
+
+[data-style='sketch'] :is(.tile, .tile.small, .icon-grid button, .sel-knob, .sel-fill, .fmtbar button, .seg button) {
+  border-radius: var(--wobble-sm);
+}
+
+[data-style='sketch'] .tile { background: var(--accent); }
+[data-style='sketch'] :is(.all-row, .arch-row) .tile { background: var(--surface); }
+[data-style='sketch'] .sel-knob { border: var(--ink-line); }
+[data-style='sketch'] .selbar { overflow: visible; }
+[data-style='sketch'] .selbar.danger .sel-knob { color: #fff; }
+[data-style='sketch'] .icon-grid button { border: 2px solid var(--line); }
+[data-style='sketch'] .icon-grid button[aria-checked='true'] { border: var(--ink-line); }
+[data-style='sketch'] .seg button[aria-checked='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
+[data-style='sketch'] .fmtbar button[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* Round things are drawn round, a little lopsided */
+[data-style='sketch'] :is(.addbar-plus, .circle, #done) {
+  border: var(--ink-line);
+  border-radius: var(--wobble-round);
+}
+
+[data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
+
+/* Popovers sit on a hard shadow, like paper cut-outs */
+[data-style='sketch'] .menu { box-shadow: 5px 5px 0 var(--ink); }
+[data-style='sketch'] .listedit { box-shadow: 6px 6px 0 var(--ink); }
+[data-style='sketch'] .menu hr { border-top: 2px dashed var(--line); }
+
+/* Dashed rules between rows */
+[data-style='sketch'] .row { border-top: 2px dashed var(--line); }
+[data-style='sketch'] :is(.row.selected, .row.selected + .row) { border-top-color: transparent; }
+[data-style='sketch'] :is(.row.selected, .arch-row.picked) { border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px; }
+
+/* A ticked item is crossed out with a pen line, not a font strike */
+[data-style='sketch'] .row.done .row-title {
+  width: fit-content;
+  max-width: 100%;
+  text-decoration: none;
+  background: linear-gradient(transparent 54%, var(--ink) 54%, var(--ink) calc(54% + 2px), transparent calc(54% + 2px));
+}
+
+/* The note sheet */
+[data-style='sketch'] .drawer {
+  border: var(--ink-line);
+  border-width: calc(2px * (1 - var(--full))) calc(2px * (1 - var(--full))) 0; /* no frame once it fills the screen */
+  border-radius: calc(20px * (1 - var(--full))) calc(16px * (1 - var(--full))) 0 0 / calc(16px * (1 - var(--full))) calc(20px * (1 - var(--full))) 0 0;
+}
+
+[data-style='sketch'] .grab span { background: var(--line); }
+[data-style='sketch'] .meta { border-bottom: 2px dashed var(--line); }
+[data-style='sketch'] #item-body .b.task::before { border: 2px solid var(--ink); border-radius: 5px 4px 6px 3px; }
+
+/* A highlighter stroke across the lower half of the words */
+/* :root, so it outranks the light theme's highlight */
+:root[data-style='sketch'] #item-body mark {
+  border-radius: 0;
+  background: linear-gradient(transparent 50%, var(--accent-soft) 50%, var(--accent-soft) 94%, transparent 94%);
+}
+
+[data-style='sketch'] .search-row mark {
+  background: var(--accent-soft);
+  color: inherit;
+}
+
+/* Page dots are drawn in outline */
+[data-style='sketch'] .dot::before { background: none; border: 1.5px solid var(--ink); opacity: 0.7; }
+[data-style='sketch'] .dot[aria-current='true']::before { background: var(--ink); opacity: 1; }
+
+[data-style='sketch'] .switch { box-shadow: inset 0 0 0 2px var(--ink); }
+[data-style='sketch'] .switch::after { background: var(--ink); }
+[data-style='sketch'] .days { border: 1.5px solid var(--ink); border-radius: 5px 4px 6px 3px; }
+[data-style='sketch'] .seg button:disabled { opacity: 0.4; }

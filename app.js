@@ -71,6 +71,8 @@ const el = {
   fmtbar: $('fmtbar'),
   themeSeg: $('theme-seg'),
   iconsSwitch: $('icons-switch'),
+  sketchSwitch: $('sketch-switch'),
+  themeNote: $('theme-note'),
   version: $('version'),
   counts: $('counts'),
   cleanupSwitch: $('cleanup-switch'),
@@ -521,8 +523,8 @@ function updateTrash() {
 const fmtButtons = [...document.querySelectorAll('#fmtbar [data-cmd]')];
 function syncToolbar() {
   if (!drawer) return;
-  const { type, bold, italic } = editor.state();
-  const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, li: type === 'li', task: type === 'task' };
+  const { type, bold, italic, mark } = editor.state();
+  const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, m: mark, li: type === 'li', task: type === 'task' };
   for (const b of fmtButtons) b.setAttribute('aria-pressed', String(!!on[b.dataset.cmd]));
 }
 for (const eventName of ['pointerdown', 'mousedown']) {
@@ -531,7 +533,7 @@ for (const eventName of ['pointerdown', 'mousedown']) {
 el.fmtbar.addEventListener('click', (e) => {
   const cmd = e.target.closest('[data-cmd]')?.dataset.cmd;
   if (!cmd || !drawer) return;
-  if (cmd === 'b' || cmd === 'i') editor.toggleInline(cmd); else editor.toggleType(cmd);
+  if (cmd === 'b' || cmd === 'i' || cmd === 'm') editor.toggleInline(cmd); else editor.toggleType(cmd);
   syncToolbar();
 });
 
@@ -2043,6 +2045,7 @@ el.searchBody.addEventListener('click', (e) => {
 
 const THEME_KEY = 'find-notes:theme';
 const ICONS_KEY = 'find-notes:icons';
+const STYLE_KEY = 'find-notes:style'; // 'sketch', or nothing for Clean
 const phoneIsLight = window.matchMedia('(prefers-color-scheme: light)');
 
 // Light, Dark, or Auto (follow the phone). Nothing saved yet means Auto.
@@ -2054,12 +2057,17 @@ function savedTheme() {
 }
 
 let theme = savedTheme();
+let sketch = false;
+try { sketch = localStorage.getItem(STYLE_KEY) === 'sketch'; } catch { /* storage blocked: Clean */ }
 
+// Sketch is a light-only look: while it is on, the theme choice waits in the background.
 function applyTheme() {
-  const light = theme === 'light' || (theme === 'auto' && phoneIsLight.matches);
+  const light = sketch || theme === 'light' || (theme === 'auto' && phoneIsLight.matches);
   document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  if (sketch) document.documentElement.dataset.style = 'sketch';
+  else delete document.documentElement.dataset.style;
   document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', light ? '#fbfbfa' : '#15181a');
+    ?.setAttribute('content', sketch ? '#f8f8ff' : light ? '#fbfbfa' : '#15181a');
 }
 
 applyTheme();
@@ -2067,8 +2075,20 @@ applyTheme();
 phoneIsLight.addEventListener('change', applyTheme);
 
 function markTheme() {
-  for (const b of el.themeSeg.children) b.setAttribute('aria-checked', String(b.dataset.themeChoice === theme));
+  for (const b of el.themeSeg.children) {
+    b.setAttribute('aria-checked', String(b.dataset.themeChoice === theme));
+    b.disabled = sketch;
+  }
+  el.themeNote.hidden = !sketch;
+  el.sketchSwitch.setAttribute('aria-checked', String(sketch));
 }
+
+el.sketchSwitch.addEventListener('click', () => {
+  sketch = !sketch;
+  try { if (sketch) localStorage.setItem(STYLE_KEY, 'sketch'); else localStorage.removeItem(STYLE_KEY); } catch { /* storage blocked */ }
+  applyTheme();
+  markTheme();
+});
 
 el.themeSeg.addEventListener('click', (e) => {
   const choice = e.target.closest('button')?.dataset.themeChoice;

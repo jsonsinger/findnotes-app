@@ -128,6 +128,9 @@
     <symbol id="i-box" viewBox="0 0 24 24">
       <path d="M3.5 4h17v4h-17zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>
     </symbol>
+    <symbol id="i-marker" viewBox="0 0 24 24">
+      <path d="M14.5 4.5l5 5-8 8h-5v-5zM6.5 12.5l5 5M4 21h9"/>
+    </symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24">
       <path d="M4 7h9M19 7h1M4 17h3M13 17h7"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/>
     </symbol>
@@ -220,6 +223,7 @@
             <button data-cmd="i" aria-label="Italic" aria-pressed="false"><span class="fmt-i">I</span></button>
             <button data-cmd="li" aria-label="Bulleted list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bullets"/></svg></button>
             <button data-cmd="task" aria-label="Tick box list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-task"/></svg></button>
+            <button data-cmd="m" aria-label="Highlight" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg></button>
         </div>
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
@@ -308,12 +312,16 @@
      <div class="screen-body">
        <h3 class="arch-heading">Appearance</h3>
        <div class="setting">
-         <span>Theme</span>
+         <span class="setting-label">Theme<small id="theme-note" hidden>Sketch is always light</small></span>
          <div class="seg" id="theme-seg" role="radiogroup" aria-label="Theme">
            <button role="radio" data-theme-choice="light">Light</button>
            <button role="radio" data-theme-choice="dark">Dark</button>
            <button role="radio" data-theme-choice="auto">Auto</button>
          </div>
+       </div>
+       <div class="setting">
+         <span class="setting-label" id="sketch-label">Sketch style<small>A hand-drawn look</small></span>
+         <button class="switch" id="sketch-switch" role="switch" aria-checked="false" aria-labelledby="sketch-label"></button>
        </div>
        <div class="setting">
          <span class="setting-label" id="icons-label">Show icons<small>Next to lists and menu items</small></span>

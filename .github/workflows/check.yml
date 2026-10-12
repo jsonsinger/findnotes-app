@@ -1,7 +1,12 @@
-# Runs check.py on every push and pull request, so a file missing from sw.js or a
+# Runs check.py on pull requests and on pushes to main, so a file missing from sw.js or a
 # forgotten VERSION bump shows up as a red X before phones get a broken update.
 name: Offline check
-on: [push, pull_request]
+# Pull requests are checked against main, so one VERSION bump covers every commit in a PR.
+# Pushes are only checked on main itself.
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   check:
     runs-on: ubuntu-latest
