@@ -42,6 +42,7 @@ const el = {
   menu: $('menu'),
   allLists: $('all-lists'),
   allRows: $('all-rows'),
+  allCount: $('all-count'),
   allNew: $('all-new'),
   archive: $('archive'),
   archiveBody: $('archive-body'),
@@ -833,7 +834,10 @@ function fitViewport(settled) {
   clearTimeout(settleTimer);
   settleTimer = 0;
 
-  el.app.style.height = keyboard ? height + 'px' : '';
+  // The list card sits near the top, so the page behind it keeps its size (an empty list's
+  // picture would jump otherwise) and the card just moves up out of the keyboard's way.
+  el.app.style.height = keyboard && el.listEdit.hidden ? height + 'px' : '';
+  el.app.classList.toggle('kb', keyboard);
   el.app.style.transform = top ? `translateY(${top}px)` : '';
   el.drawer.classList.toggle('kb', keyboard);
 
@@ -1079,6 +1083,8 @@ el.menu.addEventListener('click', (e) => {
 
 /* ---------- the All lists screen ---------- */
 
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
 function renderAll() {
   // Count the open items of every list in one pass, rather than one pass per list.
   const openCount = new Map();
@@ -1099,6 +1105,7 @@ function renderAll() {
     return row;
   });
   el.allRows.replaceChildren(...rows);
+  el.allCount.textContent = plural(state.lists.length, 'list');
 }
 
 function openAll() {
@@ -1115,10 +1122,8 @@ el.allRows.addEventListener('click', (e) => {
   closeAll();
 });
 
-el.allNew.addEventListener('click', () => {
-  closeAll();
-  newList();
-});
+// The card opens over All lists, so Cancel brings you back here. Save goes to the new list.
+el.allNew.addEventListener('click', () => newList());
 
 /* ---------- new, rename and delete a list ---------- */
 
@@ -1149,6 +1154,7 @@ function startRename(mode = 'edit') {
   if (!el.iconGrid.children.length) buildIconGrid();
   markIcon();
   lockBackground();
+  el.allLists.inert = true; // when opened from All lists, that page stays behind the card
   el.listEditTitle.textContent = mode === 'new' ? 'New list' : 'Edit list';
   el.listEdit.hidden = false;
   el.editScrim.hidden = false;
@@ -1177,10 +1183,14 @@ function finishRename(keep) {
   }
   el.listEdit.hidden = true;
   el.editScrim.hidden = true;
+  el.allLists.inert = false;
   el.titleInput.blur();
   unlockBackground();
   restoreFocus();
-  if (created) switchTo(created.id); else render();
+  if (created) {
+    switchTo(created.id);
+    if (!el.allLists.hidden) closeAll();
+  } else render();
 }
 
 el.who.addEventListener('click', () => { if (!animating) startRename(); });
@@ -2069,7 +2079,10 @@ function renderSearch() {
     el.searchBody.replaceChildren(none);
     return;
   }
-  el.searchBody.replaceChildren(...found.map(({ item, terms }) => {
+  const label = document.createElement('h3');
+  label.className = 'list-label';
+  label.textContent = plural(found.length, 'result');
+  el.searchBody.replaceChildren(label, ...found.map(({ item, terms }) => {
     const row = fromTemplate('tpl-search-row');
     row.dataset.id = item.id;
     highlight(row.querySelector('.search-title'), item.title, terms);
@@ -2214,9 +2227,8 @@ function askToPersist() {
 }
 
 function countText() {
-  const n = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
   const archived = state.archive.lists.length + looseArchivedItems().length;
-  return `${n(state.lists.length, 'list')} · ${n(state.items.length, 'item')} · ${archived} archived`;
+  return `${plural(state.lists.length, 'list')} · ${plural(state.items.length, 'item')} · ${archived} archived`;
 }
 
 function markCleanup() {

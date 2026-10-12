@@ -251,9 +251,11 @@
 
    <section class="screen" id="all-lists" role="dialog" aria-modal="true" aria-label="All lists" hidden>
      <header class="header">
+       <span class="tile"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
        <h2>All lists</h2>
      </header>
      <div class="screen-body">
+       <h3 class="list-label" id="all-count"></h3>
        <div id="all-rows"></div>
      </div>
      <button class="addbar" id="all-new">
@@ -304,7 +306,10 @@
        <button class="icon-btn" id="search-back" aria-label="Back">
          <svg class="icon" aria-hidden="true"><use href="#i-back"/></svg>
        </button>
-       <input class="search-input" id="search-input" type="search" placeholder="Search all lists" aria-label="Search all lists" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+       <label class="search-field">
+         <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+         <input class="search-input" id="search-input" type="search" placeholder="Search all lists" aria-label="Search all lists" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+       </label>
      </header>
      <div class="screen-body" id="search-body"></div>
    </section>
@@ -367,7 +372,7 @@
            <button class="setting-btn danger" id="reset-btn">Reset</button>
          </div>
        </div>
-       <p class="setting-note">Reset only if notes stop saving. Export a backup first if you can.</p>
+       <p class="made-by">Made by Quirks</p>
      </div>
      <div class="selbar danger" id="cleanupbar" hidden>
        <div class="sel-fill"></div>
@@ -423,7 +428,7 @@
     </div>
   </template>
   <template id="tpl-search-row">
-    <button class="search-row"><span class="search-title"></span><span class="search-snippet"></span><span class="search-where"></span></button>
+    <button class="search-row"><span class="search-title"></span><span class="search-where"></span><span class="search-snippet"></span></button>
   </template>
   <template id="tpl-icon-choice">
     <button role="radio"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></button>
