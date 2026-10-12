@@ -98,6 +98,7 @@ body {
 /* The gold caret, like the mock-ups. Sketch writes in ink. */
 input, [contenteditable] { caret-color: var(--accent); }
 [data-style='sketch'] :is(input, [contenteditable]) { caret-color: var(--text); }
+::selection { background: var(--accent-soft); }
 
 /* The icon sprite at the top of index.html takes no space */
 :root {
@@ -163,8 +164,8 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 22px) 14px 8px 18px;
-  min-height: 66px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 14px 10px 16px; /* tucked up under the camera, like the mock-ups */
+  min-height: 58px;
 }
 
 h1, h2 {
@@ -207,8 +208,8 @@ h1, h2 {
 }
 
 .tile {
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   border-radius: 9px;
   background: var(--tile-bg);
   color: var(--tile-text);
@@ -218,8 +219,8 @@ h1, h2 {
 }
 
 .tile .icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .tile.small {
@@ -1007,7 +1008,7 @@ h1, h2 {
 /* Tapping the list name opens this: rename or pick an icon */
 .listedit {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 100px);
+  top: calc(env(safe-area-inset-top, 0px) + 90px);
   left: 16px;
   right: 16px;
   padding: 18px 16px 16px;
@@ -1105,7 +1106,7 @@ h1, h2 {
 
 .menu {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  top: calc(env(safe-area-inset-top, 0px) + 44px);
   right: 12px;
   width: 214px;
   padding: 6px 0;
@@ -1184,6 +1185,7 @@ h1, h2 {
 }
 
 .screen > .header .tile { margin-right: 4px; }
+.screen > .header h2 { line-height: 38px; }
 
 /* "5 lists", "3 results": the small label above a full-screen list */
 .list-label {
