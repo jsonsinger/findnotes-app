@@ -263,7 +263,7 @@ h1, h2 {
 }
 
 .empty {
-  min-height: 55%;
+  min-height: 100%; /* centred in the space above the add bar */
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -1359,7 +1359,52 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* Settings */
+/* Settings: rows in rounded groups, each group under a small label */
+.settings-body {
+  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 90px);
+}
+
+.group-label {
+  padding: 18px 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.group {
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.group .setting {
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--line);
+}
+
+.group .setting:last-child {
+  border-bottom: 0;
+}
+
+/* Inside a group, controls sit a shade lighter than the group */
+.group :is(.seg, .setting-btn, .switch, .days) {
+  background: var(--bg);
+}
+
+.group .setting-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+  flex: none;
+}
+
+.settings-body .setting-note {
+  padding: 8px 4px 0;
+}
+
 .setting {
   display: flex;
   align-items: center;
@@ -1423,14 +1468,16 @@ h1, h2 {
 
 /* The number of days for auto clean-up, typed straight into the sentence */
 .days {
-  width: 3.4em;
-  margin: 0 2px;
-  padding: 1px 4px;
+  width: 72px;
+  height: 36px;
+  flex: none;
+  padding: 0 8px;
+  font-size: 16px; /* 16px or more, or phones zoom in when you tap it */
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: var(--bg);
   color: var(--text);
-  font: inherit;
+  font-family: inherit;
   font-weight: 600;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -1722,3 +1769,14 @@ h1, h2 {
 [data-style='sketch'] .switch::after { background: var(--ink); }
 [data-style='sketch'] .days { border: 1.5px solid var(--ink); border-radius: 5px 4px 6px 3px; }
 [data-style='sketch'] .seg button:disabled { opacity: 0.4; }
+
+[data-style='sketch'] .group {
+  border: var(--ink-line);
+  border-radius: var(--wobble);
+  background: var(--surface);
+}
+
+[data-style='sketch'] .group .setting { border-bottom: 2px dashed var(--line); }
+[data-style='sketch'] .group .setting:last-child { border-bottom: 0; }
+[data-style='sketch'] .group-label { font-family: var(--hand); font-size: 22px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); }
+[data-style='sketch'] .group .days { border-radius: var(--wobble-sm); }

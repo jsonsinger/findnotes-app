@@ -1349,7 +1349,23 @@ function togglePick(key) {
   setArchMode(!arch.picks.size ? 'idle' : arch.mode === 'restore' ? 'restore' : 'pick');
 }
 
+// Copies of archived records as they are now, so Undo can put them back exactly.
+const copy = (record) => ({ ...record });
+const newestFirst = (a, b) => b.archivedAt - a.archivedAt;
+
 function restoreKeys(keys) {
+  const before = { lists: [], items: [] };
+  for (const [kind, id] of keys.map(splitKey)) {
+    if (kind === 'list') {
+      const list = state.archive.lists.find((l) => l.id === id);
+      if (!list) continue;
+      before.lists.push(copy(list));
+      before.items.push(...state.archive.items.filter((i) => i.archivedWith === id).map(copy));
+    } else {
+      const item = state.archive.items.find((i) => i.id === id);
+      if (item) before.items.push(copy(item));
+    }
+  }
   let n = 0;
   for (const [kind, id] of keys.map(splitKey)) {
     if (kind === 'list') {
@@ -1360,33 +1376,75 @@ function restoreKeys(keys) {
       if (item) { restoreItem(item); n++; }
     }
   }
-  return n;
+  return { n, before };
+}
+
+// Undo a restore: the lists and items go back into the archive just as they were.
+function unrestore({ lists, items }) {
+  const listIds = new Set(lists.map((l) => l.id));
+  const itemIds = new Set(items.map((i) => i.id));
+  state.lists = state.lists.filter((l) => !listIds.has(l.id));
+  state.items = state.items.filter((i) => !itemIds.has(i.id));
+  state.archive.lists = [...lists, ...state.archive.lists].sort(newestFirst);
+  state.archive.items = [...items, ...state.archive.items].sort(newestFirst);
+  save(db.batch({ put: [...lists.map((l) => ['lists', l]), ...items.map((i) => ['items', i])] }));
+  if (!state.lists.some((l) => l.id === state.currentId)) state.currentId = state.lists[0].id;
+  render();
+  if (!el.archive.hidden) renderArchive();
 }
 
 // Gone for good, in one transaction. A list takes the items archived with it.
-function deleteForGood(keys) {
+// With `later`, the rows leave the screen now but the database keeps them until the Undo
+// toast has gone (or the app is put away), so Undo can bring them back.
+const UNDO_MS = 5000;
+let pendingDelete = null; // { remove, timer }
+
+function flushDelete() {
+  if (!pendingDelete) return;
+  clearTimeout(pendingDelete.timer);
+  save(db.batch({ remove: pendingDelete.remove }));
+  pendingDelete = null;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushDelete(); });
+addEventListener('pagehide', flushDelete);
+
+function deleteForGood(keys, { later = false } = {}) {
   const remove = [];
+  const gone = { lists: [], items: [] };
   for (const [kind, id] of keys.map(splitKey)) {
     if (kind === 'list') {
+      gone.lists.push(...state.archive.lists.filter((l) => l.id === id));
+      gone.items.push(...state.archive.items.filter((i) => i.archivedWith === id));
       const items = state.archive.items.filter((i) => i.archivedWith === id);
       state.archive.lists = state.archive.lists.filter((l) => l.id !== id);
       state.archive.items = state.archive.items.filter((i) => i.archivedWith !== id);
       remove.push(['lists', id], ...items.map((i) => ['items', i.id]));
     } else {
+      gone.items.push(...state.archive.items.filter((i) => i.id === id));
       state.archive.items = state.archive.items.filter((i) => i.id !== id);
       remove.push(['items', id]);
     }
   }
-  if (remove.length) save(db.batch({ remove }));
-  return keys.length;
+  if (!remove.length) return { n: 0 };
+  if (!later) { save(db.batch({ remove })); return { n: keys.length }; }
+  flushDelete(); // an earlier delete still waiting goes through now
+  pendingDelete = { remove, timer: setTimeout(flushDelete, UNDO_MS) };
+  const undo = () => {
+    clearTimeout(pendingDelete?.timer);
+    pendingDelete = null;
+    state.archive.lists = [...gone.lists, ...state.archive.lists].sort(newestFirst);
+    state.archive.items = [...gone.items, ...state.archive.items].sort(newestFirst);
+    if (!el.archive.hidden) renderArchive();
+  };
+  return { n: keys.length, undo };
 }
 
-function finishArch(message) {
+function finishArch(message, onUndo) {
   arch.picks.clear();
   arch.quick = false;
   renderArchive();
   setArchMode('idle');
-  showToast(message);
+  showToast(message, onUndo, UNDO_MS);
 }
 
 el.archRestore.addEventListener('click', () => setArchMode('restore'));
@@ -1400,8 +1458,8 @@ const fadePicked = (p) => {
 };
 
 makeSlider(el.restorebar, () => {
-  const n = restoreKeys([...arch.picks]);
-  finishArch(n === 1 ? 'Restored' : `${n} restored`);
+  const { n, before } = restoreKeys([...arch.picks]);
+  finishArch(n === 1 ? 'Restored' : `${n} restored`, () => unrestore(before));
 }, fadePicked);
 
 makeSlider(el.deletebar, () => {
@@ -1411,8 +1469,8 @@ makeSlider(el.deletebar, () => {
     el.deletebarHint.textContent = 'Again. No undo';
     return;
   }
-  const n = deleteForGood([...arch.picks]);
-  finishArch(n === 1 ? 'Deleted for good' : `${n} deleted for good`);
+  const { n, undo } = deleteForGood([...arch.picks], { later: true });
+  finishArch(n === 1 ? 'Deleted' : `${n} deleted`, undo);
 }, fadePicked);
 
 // Tap a row's restore button for a slide that restores that row.
@@ -2293,7 +2351,7 @@ function disarmImport() {
   pendingImport = null;
   const b = el.importBtn;
   b.classList.remove('sure');
-  b.textContent = 'Restore from a backup';
+  b.textContent = 'Restore';
 }
 
 function readBackup(text) {
@@ -2374,8 +2432,8 @@ el.importFile.addEventListener('change', async (e) => {
     pendingImport = readBackup(await file.text());
     const b = el.importBtn;
     b.classList.add('sure');
-    b.textContent = `Restore ${pendingImport.lists.length} lists, ${pendingImport.items.length} items?`;
-    say('Tap again to add them to what is here. Nothing is deleted.');
+    b.textContent = 'Restore?';
+    say(`Tap Restore again to add ${pendingImport.lists.length} lists and ${pendingImport.items.length} items to what is here. Nothing is deleted.`);
     clearTimeout(importTimer);
     importTimer = setTimeout(() => { disarmImport(); say(''); }, 8000);
   } catch (err) {
