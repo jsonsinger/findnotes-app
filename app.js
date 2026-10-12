@@ -1289,7 +1289,7 @@ function renderArchive() {
 function openArchive() {
   cleanUpArchive();
   arch.picks.clear();
-  arch.one = null;
+  arch.quick = false;
   renderArchive();
   setArchMode('idle');
   showScreen(el.archive, el.archiveBack);
@@ -1306,15 +1306,16 @@ const splitKey = (key) => [key.slice(0, key.indexOf(':')), key.slice(key.indexOf
 // What the archive is doing:
 //   idle     tap a restore button, or press and hold to pick rows
 //   pick     rows are picked; the bar offers Restore N and Delete N
-//   restore  a slide to restore one row (`one`) or the picked rows
+//   restore  a slide to restore the picked rows. Tapping a row's restore button starts here
+//            with that row (`quick`); tapping more rows adds them before you slide.
 //   delete   a red slide, twice, to delete the picked rows for good
-const arch = { mode: 'idle', picks: new Set(), one: null };
+const arch = { mode: 'idle', picks: new Set(), quick: false };
 let deleteArmed = false;
 
 function markArchRows() {
   for (const row of el.archiveBody.querySelectorAll('.arch-row')) {
     const key = keyOf(row);
-    row.classList.toggle('picked', arch.picks.has(key) || arch.one === key);
+    row.classList.toggle('picked', arch.picks.has(key));
     row.style.opacity = '';
   }
 }
@@ -1326,24 +1327,26 @@ function setArchMode(mode) {
   const n = arch.picks.size;
   el.archRestore.lastElementChild.textContent = `Restore ${n}`;
   el.archDelete.lastElementChild.textContent = `Delete ${n}`;
-  const restoring = arch.one ? 1 : n;
-  el.restorebarHint.textContent = restoring === 1 ? 'Slide to restore' : `Slide to restore ${restoring}`;
+  el.restorebarHint.textContent = n === 1 ? 'Slide to restore' : `Slide to restore ${n}`;
   deleteArmed = false;
   el.deletebar.classList.remove('final');
   el.deletebarHint.textContent = `Slide to delete ${n}`;
   markArchRows();
 }
 
-// Leaving a slide goes back to the picked rows, or to nothing picked.
+// Leaving a slide goes back to the picked rows. A slide started from a restore button
+// had no picking before it, so it goes back to nothing picked.
 const archBack = () => {
-  arch.one = null;
+  if (arch.quick) arch.picks.clear();
+  arch.quick = false;
   setArchMode(arch.picks.size ? 'pick' : 'idle');
 };
 
+// Picks or unpicks a row. While the restore slide is up, that adds to (or takes from) what it restores.
 function togglePick(key) {
-  arch.one = null;
   if (arch.picks.has(key)) arch.picks.delete(key); else arch.picks.add(key);
-  setArchMode(arch.picks.size ? 'pick' : 'idle');
+  if (!arch.picks.size) arch.quick = false;
+  setArchMode(!arch.picks.size ? 'idle' : arch.mode === 'restore' ? 'restore' : 'pick');
 }
 
 function restoreKeys(keys) {
@@ -1380,7 +1383,7 @@ function deleteForGood(keys) {
 
 function finishArch(message) {
   arch.picks.clear();
-  arch.one = null;
+  arch.quick = false;
   renderArchive();
   setArchMode('idle');
   showToast(message);
@@ -1397,7 +1400,7 @@ const fadePicked = (p) => {
 };
 
 makeSlider(el.restorebar, () => {
-  const n = restoreKeys(arch.one ? [arch.one] : [...arch.picks]);
+  const n = restoreKeys([...arch.picks]);
   finishArch(n === 1 ? 'Restored' : `${n} restored`);
 }, fadePicked);
 
@@ -1412,8 +1415,8 @@ makeSlider(el.deletebar, () => {
   finishArch(n === 1 ? 'Deleted for good' : `${n} deleted for good`);
 }, fadePicked);
 
-// Tap a row's restore button for a slide that restores just that row.
-// While rows are picked, a tap picks or unpicks a row.
+// Tap a row's restore button for a slide that restores that row.
+// While rows are picked (or the restore slide is up), a tap picks or unpicks a row.
 let archHold = null; // { id, x, y, timer }
 let archHeld = false;
 
@@ -1421,9 +1424,10 @@ el.archiveBody.addEventListener('click', (e) => {
   const row = e.target.closest('.arch-row');
   if (!row) return;
   if (archHeld) { archHeld = false; return; } // the finger lifting after a hold
-  if (arch.mode === 'pick') { togglePick(keyOf(row)); return; }
-  if (e.target.closest('[data-act="restore"]') && (arch.mode === 'idle' || (arch.mode === 'restore' && arch.one))) {
-    arch.one = keyOf(row);
+  if (arch.mode === 'pick' || arch.mode === 'restore') { togglePick(keyOf(row)); return; }
+  if (arch.mode === 'idle' && e.target.closest('[data-act="restore"]')) {
+    arch.picks.add(keyOf(row));
+    arch.quick = true;
     setArchMode('restore');
   }
 });
@@ -1437,7 +1441,7 @@ function cancelArchHold() {
 el.archiveBody.addEventListener('pointerdown', (e) => {
   const row = e.target.closest('.arch-row');
   if (!row || e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (arch.mode === 'delete' || (arch.mode === 'restore' && !arch.one)) return;
+  if (arch.mode === 'delete') return;
   cancelArchHold();
   archHeld = false;
   archHold = { id: e.pointerId, x: e.clientX, y: e.clientY, timer: 0 };

@@ -1210,6 +1210,9 @@ h1, h2 {
   gap: 12px;
   min-height: 64px;
   padding: 0 8px 0 20px;
+  /* Clear edges, so picked rows next to each other show a gap without anything moving */
+  border-block: 3px solid transparent;
+  background-clip: padding-box;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -1232,32 +1235,37 @@ h1, h2 {
 .arch-name { font-size: 17px; }
 .arch-sub { font-size: 13px; color: var(--text-muted); }
 
-/* Picking rows in the archive: a circle shows on every row, picked rows turn yellow,
-   and red when they are about to be deleted. */
+/* Picking rows in the archive: a circle takes the icon's place on every row (so the text
+   stays put), picked rows turn yellow, and red when they are about to be deleted. */
 .arch-row .circle {
   display: none;
   flex: none;
+  margin: 0 10px;
 }
 
-#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row .circle,
-#archive[data-mode='restore'] .arch-row.picked .circle {
+#archive:not([data-mode='idle']) .arch-row .circle {
   display: grid;
 }
 
-#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row [data-act='restore'],
-#archive[data-mode='restore'] .arch-row.picked [data-act='restore'] {
+#archive:not([data-mode='idle']) .arch-row .tile {
   display: none;
+}
+
+#archive:not([data-mode='idle']) .arch-row.picked [data-act='restore'],
+#archive:is([data-mode='pick'], [data-mode='delete']) .arch-row [data-act='restore'] {
+  visibility: hidden;
+}
+
+/* With icons off there is no icon to swap, so the circle never takes up room in idle either */
+.no-icons #archive:not([data-mode='idle']) .arch-row .circle {
+  margin: 0;
 }
 
 .arch-row.picked {
   margin: 0 8px;
   padding-left: 12px;
-  border-radius: 12px;
-  background: var(--accent-soft);
-}
-
-.arch-row.picked + .arch-row.picked {
-  margin-top: 4px;
+  border-radius: 15px; /* 12px, plus the clear edge */
+  background-color: var(--accent-soft);
 }
 
 .arch-row.picked .circle {
@@ -1271,7 +1279,7 @@ h1, h2 {
 }
 
 #archive[data-mode='delete'] .arch-row.picked {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background-color: color-mix(in srgb, var(--danger) 16%, transparent);
 }
 
 #archive[data-mode='delete'] .arch-row.picked .circle {
