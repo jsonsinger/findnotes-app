@@ -1181,6 +1181,9 @@ h1, h2 {
   gap: 12px;
   min-height: 64px;
   padding: 0 8px 0 20px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .arch-text {
