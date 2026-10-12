@@ -61,6 +61,7 @@ const el = {
   bannerAction: $('banner-action'),
   fmtbar: $('fmtbar'),
   themeSeg: $('theme-seg'),
+  iconsSwitch: $('icons-switch'),
   version: $('version'),
   backupStatus: $('backup-status'),
   persistStatus: $('persist-status'),
@@ -1863,30 +1864,58 @@ el.searchBody.addEventListener('click', (e) => {
 /* ---------- Settings: theme, backup and about ---------- */
 
 const THEME_KEY = 'find-notes:theme';
+const ICONS_KEY = 'find-notes:icons';
+const phoneIsLight = window.matchMedia('(prefers-color-scheme: light)');
 
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
-  document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', theme === 'light' ? '#e8eae1' : '#171716');
-}
-
+// Light, Dark, or Auto (follow the phone). Nothing saved yet means Auto.
 function savedTheme() {
-  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return t === 'light' || t === 'dark' ? t : 'auto';
+  } catch { return 'auto'; }
 }
 
-applyTheme(savedTheme());
+let theme = savedTheme();
+
+function applyTheme() {
+  const light = theme === 'light' || (theme === 'auto' && phoneIsLight.matches);
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', light ? '#fbfbfa' : '#15181a');
+}
+
+applyTheme();
+// On Auto, follow the phone when it switches between light and dark
+phoneIsLight.addEventListener('change', applyTheme);
 
 function markTheme() {
-  const theme = savedTheme();
   for (const b of el.themeSeg.children) b.setAttribute('aria-checked', String(b.dataset.themeChoice === theme));
 }
 
 el.themeSeg.addEventListener('click', (e) => {
   const choice = e.target.closest('button')?.dataset.themeChoice;
   if (!choice) return;
+  theme = choice;
   try { localStorage.setItem(THEME_KEY, choice); } catch { /* storage blocked: applies for this visit only */ }
-  applyTheme(choice);
+  applyTheme();
   markTheme();
+});
+
+// Show icons: off hides the icon next to each list, for a plainer look
+let showIcons = true;
+try { showIcons = localStorage.getItem(ICONS_KEY) !== 'off'; } catch { /* storage blocked: icons stay on */ }
+
+function applyIcons() {
+  document.documentElement.classList.toggle('no-icons', !showIcons);
+  el.iconsSwitch.setAttribute('aria-checked', String(showIcons));
+}
+
+applyIcons();
+
+el.iconsSwitch.addEventListener('click', () => {
+  showIcons = !showIcons;
+  try { localStorage.setItem(ICONS_KEY, showIcons ? 'on' : 'off'); } catch { /* storage blocked: applies for this visit only */ }
+  applyIcons();
 });
 
 // The version lives only in sw.js, so ask the worker running this page. No worker
