@@ -11,4 +11,6 @@ try {
   if (localStorage.getItem('find-notes:icons') === 'off') document.documentElement.classList.add('no-icons');
   // The status bar (on Android) is the theme's colour from the first frame, not dark
   if (light) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', sketch ? '#f8f8ff' : '#fbfbfa');
+  // and the iPhone paints anything outside the page in the theme's light or dark, not always dark
+  if (light) document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', 'light');
 } catch { /* storage blocked: stay dark, icons on */ }

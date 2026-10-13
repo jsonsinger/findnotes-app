@@ -36,6 +36,7 @@ const el = {
   bookmark: $('bookmark'),
   metaDate: $('meta-date'),
   metaList: $('meta-list'),
+  hintDone: $('hint-done'),
   toast: $('toast'),
   menuBtn: $('menu-btn'),
   menuScrim: $('menu-scrim'),
@@ -88,7 +89,6 @@ const el = {
   cleanupbarHint: $('cleanupbar-hint'),
   cleanupbarX: $('cleanupbar-x'),
   backupStatus: $('backup-status'),
-  persistStatus: $('persist-status'),
   resetBtn: $('reset-btn'),
   resetbar: $('resetbar'),
   resetbarHint: $('resetbar-hint'),
@@ -462,7 +462,8 @@ let drawer = null;
 let saveTimer = null;
 let maxTimer = null;
 const AUTOSAVE_IDLE_MS = 5000;  // editing saves itself 5 seconds after you pause...
-const AUTOSAVE_MAX_MS = 60000;  // ...or a minute after the first unsaved change, however long you type
+const AUTOSAVE_MAX_MS = 60000;
+const SAVING_MIN_MS = 700; // how long "Saving..." shows at least  // ...or a minute after the first unsaved change, however long you type
 const cancelSave = () => { clearTimeout(saveTimer); clearTimeout(maxTimer); saveTimer = maxTimer = null; };
 
 let hintError = '';
@@ -476,13 +477,23 @@ function setHint(message, isError = false) {
 
 // An error wins; otherwise it says when the note was last saved.
 function refreshHint() {
-  const saved = hintError ? '' : savedText();
+  // Editing a note: "Unsaved changes" until autosave starts, "Saving..." while it runs,
+  // then the last saved time again
+  const editing = !hintError && drawer?.mode === 'edit';
+  const unsaved = editing && drawer.pending;
+  const saving = editing && !unsaved && !!drawer.saving;
+  const saved = hintError ? '' : unsaved ? 'Unsaved changes' : saving ? 'Saving\u2026' : savedText();
   el.hintText.textContent = hintError || saved;
+  el.foot.classList.toggle('unsaved', unsaved);
+  el.foot.classList.toggle('saving', saving);
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
+  // A ticked-off note says so first: "Completed · Saved 2 min ago"
+  el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
+  el.hintDone.classList.toggle('then', !!saved);
 }
 
-// "Saved just now" / "Saved 2 min ago" (for a new note: "Draft saved ..."). It stays while you
-// type again; the gold tick says there is something newer.
+// "Saved just now" / "Saved 2 min ago" (for a new note: "Draft saved ..."). While an edit waits
+// for autosave the hint says "Unsaved changes" instead.
 function ago(t) {
   const mins = Math.floor((Date.now() - t) / 60000);
   if (mins < 1) return 'just now';
@@ -510,10 +521,12 @@ function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
 }
 
-// Gold plus: adding. White tick: saved. Gold tick: changes still on their way to being saved.
+// Gold plus: adding. Otherwise a dark tick in a gold circle. The state still marks unsaved
+// changes, for the label.
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
+  el.done.toggleAttribute('data-circle', !adding && !!drawer); // a gold circle whether or not it is done; "Completed" says which
   el.doneIcon.setAttribute('href', adding ? '#i-plus' : '#i-check');
   const label = adding ? 'Add' : drawer?.pending ? 'Save and close' : 'Close';
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
@@ -643,9 +656,17 @@ function saveEdit() {
   drawer.original = { title: drawer.item.title, body: drawer.item.body, updatedAt: drawer.item.updatedAt };
   drawer.canon = drawer.item.body;
   drawer.savedAt = Date.now();
+  drawer.saving = true;
   updateCommit();
   refreshHint();
-  save(db.put('items', drawer.item));
+  // "Saving..." stays up a moment even though the write is near instant, so it can be seen
+  const sheet = drawer;
+  const shown = new Promise((resolve) => setTimeout(resolve, SAVING_MIN_MS));
+  Promise.all([save(db.put('items', drawer.item)), shown]).then(() => {
+    if (drawer !== sheet) return; // closed, or another note opened
+    sheet.saving = false;
+    refreshHint();
+  });
 }
 
 // Two clocks: the idle one restarts on every keystroke, the other starts at the first
@@ -757,6 +778,8 @@ const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)'
 
 let sheetH = 0;   // how many pixels of the sheet are showing right now
 let sheetAnim = 0; // bumped to cancel a running animation
+let glide = null;  // the animation under way: { id, to }
+const gliding = () => glide?.id === sheetAnim;
 let drag = null;
 let lastDragEnd = 0;
 
@@ -792,11 +815,13 @@ function setSheet(h) {
 // Glide to a height. Resolves true when it arrives, false if something interrupted it.
 function animateSheet(to) {
   const id = ++sheetAnim;
+  glide = { id, to };
   const from = sheetH;
   const ms = Math.min(300, 140 + Math.abs(to - from) * 0.5);
   return new Promise((resolve) => {
     if (from === to || prefersReducedMotion()) {
       setSheet(to);
+      glide = null;
       resolve(true);
       return;
     }
@@ -806,7 +831,7 @@ function animateSheet(to) {
       const t = Math.min(1, (now - start) / ms);
       setSheet(from + (to - from) * (1 - (1 - t) ** 3)); // ease out: fast, then settles
       if (t < 1) requestAnimationFrame(step);
-      else resolve(true);
+      else { glide = null; resolve(true); }
     };
     requestAnimationFrame(step);
   });
@@ -847,12 +872,23 @@ function fitViewport(settled) {
   const full = measureFull(); // the app's height may just have changed
   if (drawer && !drag) {
     // A full-page sheet stays full-page, just above the keyboard instead of behind it.
-    const wasFull = lastFull > PEEK && sheetH >= lastFull - 2;
-    const target = wasFull ? full : Math.min(sheetH, full);
-    if (keyboard !== view.keyboard) animateSheet(target).then(revealCaret); // glide as the keyboard comes or goes
+    // Mid-glide (just opened from Search while its keyboard leaves), go by where the sheet
+    // is heading, not where it happens to be, or it gets stuck part of the way up.
+    const moving = gliding();
+    const at = moving ? glide.to : sheetH;
+    const wasFull = lastFull > PEEK && at >= lastFull - 2;
+    const target = wasFull ? full : Math.min(at, full);
+    if (moving && target === glide.to) { /* already on its way there */ }
+    else if (moving || keyboard !== view.keyboard) animateSheet(target).then(revealCaret); // glide as the keyboard comes or goes
     else setSheet(target);
   }
   lastFull = full;
+  // iOS can leave the page nudged up once the keyboard has gone, uncovering a dark strip by
+  // the camera. Put it back.
+  if (!keyboard && view.keyboard && (scrollY || document.scrollingElement?.scrollTop)) {
+    scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  }
   view = { keyboard, height, top };
   revealCaret();
 }
@@ -2153,6 +2189,7 @@ function applyTheme() {
   else delete document.documentElement.dataset.style;
   document.querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', sketch ? '#f8f8ff' : light ? '#fbfbfa' : '#15181a');
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', light ? 'light' : 'dark');
 }
 
 applyTheme();
@@ -2225,12 +2262,11 @@ function workerVersion(worker) {
 
 // Ask the browser not to clear our storage when the device is short of space. Firefox shows a
 // prompt for this, so it waits until there is something worth keeping (see addItem).
-let persisted = null;
 let askedToPersist = false;
 function askToPersist() {
   if (askedToPersist) return;
   askedToPersist = true;
-  navigator.storage?.persist?.().then((ok) => { persisted = ok; }, () => {});
+  navigator.storage?.persist?.().catch(() => {});
 }
 
 function countText() {
@@ -2251,10 +2287,6 @@ function openSettings() {
   checking = '';
   markUpdate();
   el.backupStatus.textContent = '';
-  const ask = navigator.storage?.persisted?.();
-  (ask ?? Promise.resolve(persisted)).then((ok) => {
-    el.persistStatus.textContent = memoryOnly ? 'Not working' : ok ? 'Protected' : 'Can be cleared by the browser';
-  }, () => { el.persistStatus.textContent = memoryOnly ? 'Not working' : 'Unknown'; });
   showScreen(el.settings, el.settingsBack);
 }
 

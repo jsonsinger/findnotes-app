@@ -86,6 +86,9 @@
 }
 
 html, body { overscroll-behavior: none; overflow: hidden; height: 100%; }
+/* The page behind the app is the theme's colour too, so a strip the phone uncovers by the
+   camera (after the keyboard has been up) matches the app instead of showing black. */
+html { background: var(--bg); }
 
 /* An app, not a page: a long press never selects words or pops up the copy menu.
    The note editor turns selection back on. */
@@ -370,22 +373,34 @@ h1, h2 {
   align-items: flex-start;
   gap: 6px;
   padding: 6px 20px 6px 8px;
-  border-top: 0.5px solid var(--line);
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
 
+/* A thin line between rows, strongest in the middle and fading out before the edges, so
+   the edges stay clean. None above the first row. */
+.row + .row::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--line-strong) 50%, transparent);
+  pointer-events: none;
+}
+
+.row.selected::after,
+.row.selected + .row::after {
+  display: none;
+}
+
 /* Long-press selects a row. A selected row has a gold circle and a lighter background. */
 .row.selected {
-  border-top-color: transparent;
   margin: 0 8px;
   padding-left: 0;
   padding-right: 12px;
-}
-
-.row.selected + .row {
-  border-top-color: transparent;
 }
 
 .row.selected::before {
@@ -926,24 +941,49 @@ h1, h2 {
   stroke-width: 2;
 }
 
+/* Changes waiting for autosave: gold, but toned down to the grey's strength */
+.drawer-top.unsaved #hint-text { color: color-mix(in srgb, var(--accent-text) 55%, var(--text-muted)); }
+
 .drawer-top.error #hint {
   color: var(--danger);
 }
 
-/* The confirm glyph: a gold plus when adding, a white tick when saved, a gold tick while
-   changes are still waiting to be saved. */
+/* The confirm glyph: a gold plus when adding, otherwise a tick in a gold circle. */
 #done {
   color: var(--text);
 }
 
-#done[data-state='plus'],
-#done[data-state='pending'] {
+#done[data-state='plus'] {
   color: var(--accent-text);
 }
 
 #done .icon {
   stroke-width: 2.2;
 }
+
+/* Editing: the same gold circle and dark tick as a done row, always (the hint says Completed) */
+#done[data-circle] { position: relative; transition: opacity 0.2s; }
+
+/* While saving, the tick dims, then comes back */
+.drawer-top.saving #done { opacity: 0.4; }
+
+#done[data-circle]::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 1.8px solid var(--accent);
+  background: var(--accent);
+}
+
+#done[data-circle] .icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.6;
+  color: var(--on-accent);
+}
+
 
 #bookmark[aria-pressed='true'] {
   color: var(--text-muted);
@@ -957,7 +997,7 @@ h1, h2 {
 .meta {
   display: none;
   flex: none;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   justify-content: space-between;
   margin: -8px 0 16px;
@@ -968,6 +1008,10 @@ h1, h2 {
 .drawer.show-meta .meta {
   display: flex;
 }
+
+/* "Completed" leads the hint when the note is ticked off, with a dot before the saved time */
+#hint-done { color: var(--text-muted); }
+#hint-done.then::after { content: '\00b7'; margin: 0 6px; color: var(--text-muted); }
 
 /* Toast: a short message with an optional Undo */
 .toast {
@@ -1915,6 +1959,8 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] #done[data-circle]::before { display: none; } /* Sketch's tick is already drawn in a circle */
+[data-style='sketch'] #done[data-circle] { background: var(--accent); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */
@@ -1923,8 +1969,13 @@ h1, h2 {
 [data-style='sketch'] .menu hr { border-top: 2px dashed var(--line); }
 
 /* Dashed rules between rows */
-[data-style='sketch'] .row { border-top: 2px dashed var(--line); }
-[data-style='sketch'] :is(.row.selected, .row.selected + .row) { border-top-color: transparent; }
+[data-style='sketch'] .row + .row::after {
+  height: 0;
+  background: none;
+  border-top: 2px dashed var(--line);
+  mask: linear-gradient(to right, transparent, #000 30%, #000 70%, transparent);
+  -webkit-mask: linear-gradient(to right, transparent, #000 30%, #000 70%, transparent);
+}
 [data-style='sketch'] .row.selected::before,
 [data-style='sketch'] .arch-row.picked { border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px; }
 
