@@ -972,31 +972,12 @@ h1, h2 {
   display: flex;
 }
 
-/* Done, at the start of the story header: the same gold circle as a ticked row */
+/* Done, at the start of the top bar at every height: the same circle as the note's row */
 .meta-done {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-right: 6px;
-  font-size: 13px;
-  color: var(--text-muted);
+  margin: 0 2px 0 -10px; /* lines the circle up with the title below */
 }
 
 .meta-done[hidden] { display: none; }
-#meta-list { margin-right: auto; }
-
-.meta-done .circle {
-  width: 18px;
-  height: 18px;
-  border-width: 1.5px;
-}
-
-.meta-done .circle .icon {
-  width: 11px;
-  height: 11px;
-}
-
-.meta-done[aria-checked='true'] { color: var(--text); }
 
 .meta-done[aria-checked='true'] .circle {
   border-color: var(--accent);

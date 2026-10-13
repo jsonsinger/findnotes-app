@@ -697,7 +697,7 @@ el.itemTitle.addEventListener('input', () => {
   scheduleSave();
 });
 
-// At full height the note shows whether it is done, and can be ticked or unticked there too.
+// The top bar shows whether the note is done, and it can be ticked or unticked there too.
 el.metaDone.addEventListener('click', () => {
   if (drawer?.mode !== 'edit') return;
   const item = drawer.item;
