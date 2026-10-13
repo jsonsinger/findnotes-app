@@ -78,6 +78,9 @@ const el = {
   sketchSwitch: $('sketch-switch'),
   themeNote: $('theme-note'),
   version: $('version'),
+  updateNote: $('update-note'),
+  updateBtn: $('update-btn'),
+  autoupdateSwitch: $('autoupdate-switch'),
   counts: $('counts'),
   cleanupSwitch: $('cleanup-switch'),
   cleanupDays: $('cleanup-days'),
@@ -2208,6 +2211,10 @@ function appVersion() {
       .then((r) => r.text())
       .then((text) => /const VERSION = '([^']+)'/.exec(text)?.[1] ?? 'Unknown', () => 'Unknown');
   }
+  return workerVersion(worker);
+}
+
+function workerVersion(worker) {
   return new Promise((resolve) => {
     const channel = new MessageChannel();
     channel.port1.onmessage = (e) => resolve(String(e.data));
@@ -2241,6 +2248,8 @@ function openSettings() {
   markCleanup();
   el.counts.textContent = countText();
   appVersion().then((v) => { el.version.textContent = v; });
+  checking = '';
+  markUpdate();
   el.backupStatus.textContent = '';
   const ask = navigator.storage?.persisted?.();
   (ask ?? Promise.resolve(persisted)).then((ok) => {
@@ -2516,16 +2525,23 @@ function setupOffline() {
 
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('sw.js').then((reg) => {
-    const offer = () => showBanner('A new version of FindNotes is ready.', 'Update', () => reg.waiting?.postMessage('skip-waiting'));
-    if (reg.waiting && navigator.serviceWorker.controller) offer();
+    swReg = reg;
+    if (reg.waiting && navigator.serviceWorker.controller) updateReady(true);
     reg.addEventListener('updatefound', () => {
       const worker = reg.installing;
+      markUpdate();
       worker?.addEventListener('statechange', () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) offer();
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) updateReady(false);
+        else markUpdate();
       });
     });
-    // Coming back to the app is a good moment to look for a new version.
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    // Coming back to the app is a good moment to look for a new version, or to put in
+    // one that is waiting (if updating automatically is on).
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (reg.waiting && autoUpdate) updateReady(true);
+      reg.update().catch(() => {});
+    });
   }, (error) => console.error('Offline support unavailable', error));
 
   let reloading = false;
@@ -2535,6 +2551,70 @@ function setupOffline() {
     location.reload();
   });
 }
+
+// A new version waits until you say so: Settings > Version shows Update, and a gold dot on
+// the menu points there. With "Update automatically" on, a small update (only the last number
+// changes, 0.0.21 to 0.0.22) goes in by itself when the app opens or you come back to it,
+// never while you're in the middle of something. Bigger ones always wait for the button.
+const AUTOUPDATE_KEY = 'find-notes:autoupdate';
+let swReg = null;
+let checking = ''; // what Check found, shown under the version
+let busy = false;
+let autoUpdate = false;
+try { autoUpdate = localStorage.getItem(AUTOUPDATE_KEY) === 'on'; } catch { /* storage blocked: off */ }
+
+const isSmallUpdate = (from, to) => {
+  const [a, b] = [from, to].map((v) => v.split('.'));
+  return a.length === 3 && b.length === 3 && a[0] === b[0] && a[1] === b[1];
+};
+
+// opening: the app has just started or come back, so nothing is half done
+async function updateReady(opening) {
+  markUpdate();
+  if (!autoUpdate || !opening || !swReg?.waiting) return;
+  const [from, to] = await Promise.all([appVersion(), workerVersion(swReg.waiting)]);
+  if (isSmallUpdate(from, to)) installUpdate();
+}
+
+function installUpdate() {
+  swReg?.waiting?.postMessage('skip-waiting'); // the page reloads on controllerchange
+}
+
+function markUpdate() {
+  const ready = !!(swReg?.waiting && navigator.serviceWorker.controller);
+  document.documentElement.classList.toggle('has-update', ready);
+  el.autoupdateSwitch.setAttribute('aria-checked', String(autoUpdate));
+  el.updateBtn.hidden = !swReg;
+  el.updateBtn.textContent = ready ? 'Update' : 'Check';
+  el.updateBtn.classList.toggle('sure', ready);
+  el.updateBtn.disabled = !ready && (busy || !!swReg?.installing);
+  el.updateNote.textContent = !swReg ? 'Updates are off on this computer'
+    : ready ? 'A new version is ready'
+    : swReg.installing ? 'Getting the new version'
+    : checking;
+}
+
+el.updateBtn.addEventListener('click', async () => {
+  if (swReg?.waiting) { installUpdate(); return; }
+  if (!swReg) return;
+  checking = 'Checking';
+  busy = true;
+  markUpdate();
+  try {
+    await swReg.update();
+    checking = swReg.installing || swReg.waiting ? '' : 'Up to date';
+  } catch {
+    checking = 'Couldn\'t check. Are you online?';
+  }
+  busy = false;
+  markUpdate();
+});
+
+el.autoupdateSwitch.addEventListener('click', () => {
+  autoUpdate = !autoUpdate;
+  try { localStorage.setItem(AUTOUPDATE_KEY, autoUpdate ? 'on' : 'off'); } catch { /* storage blocked: this visit only */ }
+  markUpdate();
+});
 
 /* ---------- start ---------- */
 

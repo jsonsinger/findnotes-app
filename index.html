@@ -376,7 +376,14 @@
        <h3 class="group-label">About</h3>
        <div class="group">
          <div class="setting"><span>Your notes</span><span class="setting-value" id="counts"></span></div>
-         <div class="setting"><span>Version</span><span class="setting-value" id="version"></span></div>
+         <div class="setting">
+           <span class="setting-label">Version <span class="setting-value" id="version"></span><small id="update-note"></small></span>
+           <button class="setting-btn" id="update-btn">Check</button>
+         </div>
+         <div class="setting">
+           <span class="setting-label" id="autoupdate-label">Update automatically<small>Small updates, when you next open the app</small></span>
+           <button class="switch" id="autoupdate-switch" role="switch" aria-checked="false" aria-labelledby="autoupdate-label"></button>
+         </div>
          <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
          <div class="setting">
            <span class="setting-label">Reset storage<small>Deletes every list and note here</small></span>
