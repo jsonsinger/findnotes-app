@@ -36,6 +36,7 @@ const el = {
   bookmark: $('bookmark'),
   metaDate: $('meta-date'),
   metaList: $('meta-list'),
+  metaDone: $('meta-done'),
   toast: $('toast'),
   menuBtn: $('menu-btn'),
   menuScrim: $('menu-scrim'),
@@ -88,7 +89,6 @@ const el = {
   cleanupbarHint: $('cleanupbar-hint'),
   cleanupbarX: $('cleanupbar-x'),
   backupStatus: $('backup-status'),
-  persistStatus: $('persist-status'),
   resetBtn: $('reset-btn'),
   resetbar: $('resetbar'),
   resetbarHint: $('resetbar-hint'),
@@ -568,6 +568,8 @@ function showDrawer(mode, item) {
   updateTrash();
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
+  el.metaDone.hidden = mode !== 'edit';
+  el.metaDone.setAttribute('aria-checked', String(!!item?.done));
   setBookmark(drawer.bookmarked);
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
@@ -695,6 +697,16 @@ el.itemTitle.addEventListener('input', () => {
   scheduleSave();
 });
 
+// At full height the note shows whether it is done, and can be ticked or unticked there too.
+el.metaDone.addEventListener('click', () => {
+  if (drawer?.mode !== 'edit') return;
+  const item = drawer.item;
+  item.done = !item.done;
+  el.metaDone.setAttribute('aria-checked', String(item.done));
+  save(db.put('items', item));
+  render();
+});
+
 el.bookmark.addEventListener('click', () => {
   if (!drawer) return;
   drawer.bookmarked = !drawer.bookmarked;
@@ -757,6 +769,8 @@ const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)'
 
 let sheetH = 0;   // how many pixels of the sheet are showing right now
 let sheetAnim = 0; // bumped to cancel a running animation
+let glide = null;  // the animation under way: { id, to }
+const gliding = () => glide?.id === sheetAnim;
 let drag = null;
 let lastDragEnd = 0;
 
@@ -792,11 +806,13 @@ function setSheet(h) {
 // Glide to a height. Resolves true when it arrives, false if something interrupted it.
 function animateSheet(to) {
   const id = ++sheetAnim;
+  glide = { id, to };
   const from = sheetH;
   const ms = Math.min(300, 140 + Math.abs(to - from) * 0.5);
   return new Promise((resolve) => {
     if (from === to || prefersReducedMotion()) {
       setSheet(to);
+      glide = null;
       resolve(true);
       return;
     }
@@ -806,7 +822,7 @@ function animateSheet(to) {
       const t = Math.min(1, (now - start) / ms);
       setSheet(from + (to - from) * (1 - (1 - t) ** 3)); // ease out: fast, then settles
       if (t < 1) requestAnimationFrame(step);
-      else resolve(true);
+      else { glide = null; resolve(true); }
     };
     requestAnimationFrame(step);
   });
@@ -847,12 +863,23 @@ function fitViewport(settled) {
   const full = measureFull(); // the app's height may just have changed
   if (drawer && !drag) {
     // A full-page sheet stays full-page, just above the keyboard instead of behind it.
-    const wasFull = lastFull > PEEK && sheetH >= lastFull - 2;
-    const target = wasFull ? full : Math.min(sheetH, full);
-    if (keyboard !== view.keyboard) animateSheet(target).then(revealCaret); // glide as the keyboard comes or goes
+    // Mid-glide (just opened from Search while its keyboard leaves), go by where the sheet
+    // is heading, not where it happens to be, or it gets stuck part of the way up.
+    const moving = gliding();
+    const at = moving ? glide.to : sheetH;
+    const wasFull = lastFull > PEEK && at >= lastFull - 2;
+    const target = wasFull ? full : Math.min(at, full);
+    if (moving && target === glide.to) { /* already on its way there */ }
+    else if (moving || keyboard !== view.keyboard) animateSheet(target).then(revealCaret); // glide as the keyboard comes or goes
     else setSheet(target);
   }
   lastFull = full;
+  // iOS can leave the page nudged up once the keyboard has gone, uncovering a dark strip by
+  // the camera. Put it back.
+  if (!keyboard && view.keyboard && (scrollY || document.scrollingElement?.scrollTop)) {
+    scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  }
   view = { keyboard, height, top };
   revealCaret();
 }
@@ -2153,6 +2180,7 @@ function applyTheme() {
   else delete document.documentElement.dataset.style;
   document.querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', sketch ? '#f8f8ff' : light ? '#fbfbfa' : '#15181a');
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', light ? 'light' : 'dark');
 }
 
 applyTheme();
@@ -2225,12 +2253,11 @@ function workerVersion(worker) {
 
 // Ask the browser not to clear our storage when the device is short of space. Firefox shows a
 // prompt for this, so it waits until there is something worth keeping (see addItem).
-let persisted = null;
 let askedToPersist = false;
 function askToPersist() {
   if (askedToPersist) return;
   askedToPersist = true;
-  navigator.storage?.persist?.().then((ok) => { persisted = ok; }, () => {});
+  navigator.storage?.persist?.().catch(() => {});
 }
 
 function countText() {
@@ -2251,10 +2278,6 @@ function openSettings() {
   checking = '';
   markUpdate();
   el.backupStatus.textContent = '';
-  const ask = navigator.storage?.persisted?.();
-  (ask ?? Promise.resolve(persisted)).then((ok) => {
-    el.persistStatus.textContent = memoryOnly ? 'Not working' : ok ? 'Protected' : 'Can be cleared by the browser';
-  }, () => { el.persistStatus.textContent = memoryOnly ? 'Not working' : 'Unknown'; });
   showScreen(el.settings, el.settingsBack);
 }
 

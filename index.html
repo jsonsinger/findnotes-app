@@ -223,6 +223,9 @@
         </div>
         <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
         <div class="meta" id="meta">
+            <button class="meta-done" id="meta-done" role="checkbox" aria-checked="false" hidden>
+                <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>Done
+            </button>
             <span id="meta-list"></span>
             <span id="meta-date"></span>
         </div>
@@ -354,7 +357,7 @@
        <h3 class="group-label">Your data</h3>
        <div class="group">
          <div class="setting">
-           <span class="setting-label">Export a backup<small>A file to keep somewhere safe</small></span>
+           <span class="setting-label">Export a backup<small>Notes only live on this phone, so keep a copy</small></span>
            <button class="setting-btn" id="export-btn">Export</button>
          </div>
          <div class="setting">
@@ -366,12 +369,11 @@
            <button class="switch" id="cleanup-switch" role="switch" aria-checked="false" aria-labelledby="cleanup-label"></button>
          </div>
          <div class="setting">
-           <label class="setting-label" for="cleanup-days">Days in the archive<small>Before clean-up deletes them, 1 to 999</small></label>
+           <label class="setting-label" for="cleanup-days">Days in the archive<small>Before clean-up deletes them</small></label>
            <input class="days" id="cleanup-days" type="number" inputmode="numeric" min="1" max="999" value="30">
          </div>
        </div>
        <input type="file" id="import-file" accept="application/json,.json" hidden>
-       <p class="setting-note">Your notes live only on this device. Save backups to Files or Drive, in a folder called FindNotes, so they are easy to find.</p>
        <p class="setting-note" id="backup-status" role="status"></p>
        <h3 class="group-label">About</h3>
        <div class="group">
@@ -384,7 +386,6 @@
            <span class="setting-label" id="autoupdate-label">Update automatically<small>Small updates, when you next open the app</small></span>
            <button class="switch" id="autoupdate-switch" role="switch" aria-checked="false" aria-labelledby="autoupdate-label"></button>
          </div>
-         <div class="setting"><span>Storage</span><span class="setting-value" id="persist-status">Checking</span></div>
          <div class="setting">
            <span class="setting-label">Reset storage<small>Deletes every list and note here</small></span>
            <button class="setting-btn danger" id="reset-btn">Reset</button>

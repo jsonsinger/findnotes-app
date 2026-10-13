@@ -86,6 +86,9 @@
 }
 
 html, body { overscroll-behavior: none; overflow: hidden; height: 100%; }
+/* The page behind the app is the theme's colour too, so a strip the phone uncovers by the
+   camera (after the keyboard has been up) matches the app instead of showing black. */
+html { background: var(--bg); }
 
 /* An app, not a page: a long press never selects words or pops up the copy menu.
    The note editor turns selection back on. */
@@ -957,7 +960,7 @@ h1, h2 {
 .meta {
   display: none;
   flex: none;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   justify-content: space-between;
   margin: -8px 0 16px;
@@ -968,6 +971,40 @@ h1, h2 {
 .drawer.show-meta .meta {
   display: flex;
 }
+
+/* Done, at the start of the story header: the same gold circle as a ticked row */
+.meta-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.meta-done[hidden] { display: none; }
+#meta-list { margin-right: auto; }
+
+.meta-done .circle {
+  width: 18px;
+  height: 18px;
+  border-width: 1.5px;
+}
+
+.meta-done .circle .icon {
+  width: 11px;
+  height: 11px;
+}
+
+.meta-done[aria-checked='true'] { color: var(--text); }
+
+.meta-done[aria-checked='true'] .circle {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.meta-done[aria-checked='true'] .circle .icon { display: block; }
 
 /* Toast: a short message with an optional Undo */
 .toast {
@@ -1914,7 +1951,7 @@ h1, h2 {
   border-radius: var(--wobble-round);
 }
 
-[data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] :is(.row.done, .meta-done[aria-checked='true']) .circle { border-color: var(--ink); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */
