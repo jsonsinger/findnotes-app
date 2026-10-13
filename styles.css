@@ -954,8 +954,8 @@ h1, h2 {
   color: var(--accent-text);
 }
 
-/* Changes waiting for autosave are told in words, the same for done and not-done notes */
-.drawer-top.unsaved #hint-text { color: var(--accent-text); }
+/* Changes waiting for autosave are told in words, the same for done and not-done notes,
+   in the hint's usual quiet grey */
 
 #done .icon {
   stroke-width: 2.2;
