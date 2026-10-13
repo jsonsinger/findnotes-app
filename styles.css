@@ -1712,6 +1712,46 @@ h1, h2 {
   color: var(--text-muted);
 }
 
+/* The update note sits on the Version line, after the number */
+#update-note {
+  display: inline;
+  margin-left: 2px;
+}
+#update-note::before { content: ' \00b7  '; }
+#update-note:empty { display: none; }
+
+/* Under the version: the app's stage and a link to the What's new page on findnotes.io */
+.whats-new {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.whats-new .wn-stage {
+  padding: 1px 6px;
+  border: 1px dashed currentColor;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.whats-new .icon {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.2;
+}
+
+[data-style='sketch'] .whats-new { font-family: 'Karla', system-ui, sans-serif; font-weight: 700; }
+[data-style='sketch'] .whats-new .wn-stage { border: 1.5px dashed var(--ink); color: var(--ink); }
+
 /* On/off switch */
 .switch {
   position: relative;
