@@ -916,7 +916,8 @@ h1, h2 {
 }
 
 /* A highlighted title. The field can't paint behind its own words, so a copy of the title
-   sits behind it with the highlighter on, and the field's text is drawn over the top. */
+   sits behind it with the highlights on. The field's words go see-through, leaving its
+   cursor and selection drawn over the copy. */
 .title-field {
   position: relative;
   flex: none;
@@ -932,7 +933,6 @@ h1, h2 {
   inset: 0;
   overflow: hidden;
   white-space: pre;
-  color: transparent;
   pointer-events: none;
 }
 
@@ -945,14 +945,17 @@ h1, h2 {
   box-decoration-break: clone;
 }
 
-/* The dark highlight is solid gold, so the words on it go dark */
-:root:not([data-theme='light']) .title-field.marked #item-title {
-  color: var(--on-accent);
+.title-field.marked #item-title {
+  color: transparent;
+  caret-color: var(--text);
+}
+
+.title-field.marked #item-title::selection {
+  background: rgba(70, 130, 240, 0.35);
 }
 
 .title-mark .title-hl {
   margin: 0 -1px; /* its padding mustn't push the words out of line with the field */
-  color: transparent;
 }
 
 /* While the title has the cursor, only the highlighter works on it */
