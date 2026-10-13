@@ -9,4 +9,6 @@ try {
   if (light) document.documentElement.dataset.theme = 'light';
   if (sketch) document.documentElement.dataset.style = 'sketch';
   if (localStorage.getItem('find-notes:icons') === 'off') document.documentElement.classList.add('no-icons');
+  // The status bar (on Android) is the theme's colour from the first frame, not dark
+  if (light) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', sketch ? '#f8f8ff' : '#fbfbfa');
 } catch { /* storage blocked: stay dark, icons on */ }
