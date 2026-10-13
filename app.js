@@ -476,16 +476,19 @@ function setHint(message, isError = false) {
 
 // An error wins; otherwise it says when the note was last saved.
 function refreshHint() {
-  const saved = hintError ? '' : savedText();
+  // Editing a note: until autosave catches up, say so instead of the last saved time
+  const unsaved = !hintError && drawer?.mode === 'edit' && drawer.pending;
+  const saved = hintError ? '' : unsaved ? 'Unsaved changes' : savedText();
   el.hintText.textContent = hintError || saved;
+  el.foot.classList.toggle('unsaved', unsaved);
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
   el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
   el.hintDone.classList.toggle('then', !!saved);
 }
 
-// "Saved just now" / "Saved 2 min ago" (for a new note: "Draft saved ..."). It stays while you
-// type again; the gold tick says there is something newer.
+// "Saved just now" / "Saved 2 min ago" (for a new note: "Draft saved ..."). While an edit waits
+// for autosave the hint says "Unsaved changes" instead.
 function ago(t) {
   const mins = Math.floor((Date.now() - t) / 60000);
   if (mins < 1) return 'just now';
@@ -513,7 +516,8 @@ function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
 }
 
-// Gold plus: adding. White tick: saved. Gold tick: changes still on their way to being saved.
+// Gold plus: adding. Otherwise a tick, filled gold once the note is done. The state still marks
+// unsaved changes, for the label.
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';

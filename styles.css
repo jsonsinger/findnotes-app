@@ -945,23 +945,24 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* The confirm glyph: a gold plus when adding, a white tick when saved, a gold tick while
-   changes are still waiting to be saved. */
+/* The confirm glyph: a gold plus when adding, otherwise a tick (in the gold circle once the
+   note is done). */
 #done {
   color: var(--text);
 }
 
-#done[data-state='plus'],
-#done[data-state='pending'] {
+#done[data-state='plus'] {
   color: var(--accent-text);
 }
+
+/* Changes waiting for autosave are told in words, the same for done and not-done notes */
+.drawer-top.unsaved #hint-text { color: var(--accent-text); }
 
 #done .icon {
   stroke-width: 2.2;
 }
 
-/* A completed note: the same gold circle and dark tick as its row in the list. With changes
-   still waiting to be saved it is a gold ring around a gold tick, the circle not yet filled. */
+/* A completed note: the same gold circle and dark tick as its row in the list */
 #done[data-completed] { position: relative; }
 
 #done[data-completed]::before {
@@ -981,8 +982,6 @@ h1, h2 {
   color: var(--on-accent);
 }
 
-#done[data-completed][data-state='pending']::before { background: none; }
-#done[data-completed][data-state='pending'] .icon { color: var(--accent-text); }
 
 #bookmark[aria-pressed='true'] {
   color: var(--text-muted);
@@ -1959,7 +1958,7 @@ h1, h2 {
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
 [data-style='sketch'] #done[data-completed]::before { display: none; } /* Sketch's tick is already drawn in a circle */
-[data-style='sketch'] #done[data-completed]:not([data-state='pending']) { background: var(--accent); }
+[data-style='sketch'] #done[data-completed] { background: var(--accent); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */
