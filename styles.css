@@ -941,6 +941,9 @@ h1, h2 {
   stroke-width: 2;
 }
 
+/* Changes waiting for autosave: gold, but toned down to the grey's strength */
+.drawer-top.unsaved #hint-text { color: color-mix(in srgb, var(--accent-text) 55%, var(--text-muted)); }
+
 .drawer-top.error #hint {
   color: var(--danger);
 }
