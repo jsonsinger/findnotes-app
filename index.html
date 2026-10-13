@@ -10,8 +10,9 @@
   <title>FindNotes</title>
   <meta name="description" content="Lists that can grow into notes.">
   <meta name="color-scheme" content="dark">
-  <script src="theme.js"></script>
   <meta name="theme-color" content="#15181a">
+  <!-- After theme-color, so it can set that too -->
+  <script src="theme.js"></script>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -40,6 +41,16 @@
   <link rel="modulepreload" href="editor.js">
 </head>
 <body>
+  <!-- The opening screen: drawn in the very first frame, in the theme's colours, then
+       app.js fades it out once the lists are ready (at least about a second after launch).
+       It matches the iPhone launch images in splash/, so the hand-over is seamless. -->
+  <div class="boot" id="boot" aria-hidden="true">
+    <svg class="boot-flame" viewBox="0 0 24 24">
+      <path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
+    </svg>
+    <div class="boot-bar"><span></span></div>
+  </div>
+
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
   <svg class="sprite" width="0" height="0" aria-hidden="true">
     <symbol id="i-flame" viewBox="0 0 24 24">

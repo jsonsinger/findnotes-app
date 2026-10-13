@@ -1988,3 +1988,81 @@ h1, h2 {
 [data-style='sketch'] .listedit-actions .setting-btn.go { background: var(--accent); }
 [data-style='sketch'] .arch-row [data-act='restore'] { border: var(--ink-line); border-radius: var(--wobble-round); background: var(--surface); color: var(--ink); }
 [data-style='sketch'] .dot[aria-current='true']::before { border-radius: 4px; background: var(--accent); border-color: var(--ink); }
+
+/* ---------- Opening screen ----------
+   A flickering flame and a gold bar while the app starts (index.html, #boot). The first frame
+   matches the iPhone launch images in splash/: flame centred, bar empty. app.js adds .done
+   when the lists are ready, which fills the bar and fades the screen away. */
+.boot {
+  --boot-ink: var(--accent);
+  --boot-fill: var(--accent-soft);
+  --boot-bar: var(--accent);
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: var(--bg);
+  transition: opacity 0.35s ease, visibility 0s 0.35s;
+  /* If app.js never gets to say it's ready, don't hide the app forever */
+  animation: boot-giveup 0.35s 6s forwards;
+}
+
+/* Light: deep gold line on yellow. Sketch gets ink, from its own --accent-text and --bullet. */
+:root[data-theme='light'] .boot { --boot-ink: var(--accent-text); --boot-fill: var(--accent); --boot-bar: var(--bullet); }
+
+.boot.done { opacity: 0; visibility: hidden; }
+
+/* The bar sits below the centre, so the flame alone is centred, like the launch image */
+.boot-flame {
+  width: 64px;
+  height: 64px;
+  margin-top: 31px; /* the bar and gap below: 28 + 3 */
+  fill: var(--boot-fill);
+  fill-opacity: 0;
+  stroke: var(--boot-ink);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform-origin: 50% 90%;
+  animation: boot-flicker 0.9s ease-in-out infinite alternate, boot-glow 1s ease-out forwards;
+}
+
+.boot-bar {
+  width: 96px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.boot-bar span {
+  display: block;
+  height: 100%;
+  background: var(--boot-bar);
+  transform-origin: left;
+  transform: scaleX(0);
+  /* Most of the way in a second; the last bit when the app is ready */
+  animation: boot-progress 1s cubic-bezier(0.3, 0.6, 0.4, 1) forwards;
+}
+
+.boot.done .boot-bar span { transform: scaleX(1); animation: none; transition: transform 0.2s ease-out; }
+
+@keyframes boot-flicker {
+  0%   { transform: scale(1, 1) skewX(0deg); }
+  30%  { transform: scale(0.97, 1.04) skewX(-2deg); }
+  60%  { transform: scale(1.02, 0.98) skewX(1.5deg); }
+  100% { transform: scale(0.98, 1.05) skewX(-1deg); }
+}
+
+@keyframes boot-glow { to { fill-opacity: 1; } }
+@keyframes boot-progress { to { transform: scaleX(0.85); } }
+@keyframes boot-giveup { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-flame { animation: none; fill-opacity: 1; }
+  .boot-bar { visibility: hidden; }
+}

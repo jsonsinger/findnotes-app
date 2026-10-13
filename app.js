@@ -2564,6 +2564,22 @@ async function init() {
     ? remembered
     : state.lists[0].id;
   render();
+  hideBoot();
+}
+
+// The opening screen (#boot in index.html) stays about a second after launch, so the flame
+// and its bar are seen rather than flashed, then fades into the app. With reduced motion
+// there is nothing to watch, so it goes as soon as the lists are ready.
+const BOOT_MIN_MS = 1000;
+function hideBoot() {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  // performance.now() counts from when the app started opening
+  const wait = prefersReducedMotion() ? 0 : Math.max(0, BOOT_MIN_MS - performance.now());
+  setTimeout(() => {
+    boot.classList.add('done');
+    setTimeout(() => boot.remove(), 400); // after the fade in styles.css
+  }, wait);
 }
 
 init();
