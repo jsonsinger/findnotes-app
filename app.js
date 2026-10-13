@@ -27,6 +27,8 @@ const el = {
   drawer: $('drawer'),
   trash: $('trash'),
   itemTitle: $('item-title'),
+  titleField: $('title-field'),
+  titleMark: $('title-mark'),
   itemBody: $('item-body'),
   foot: $('drawer-top'),
   hintIcon: $('hint-icon'),
@@ -256,7 +258,15 @@ function renderRow(item) {
   row.dataset.id = item.id;
 
   row.querySelector('.check').setAttribute('aria-checked', String(item.done));
-  row.querySelector('.row-title').textContent = item.title;
+  const rowTitle = row.querySelector('.row-title');
+  if (item.marked) {
+    const hl = document.createElement('span');
+    hl.className = 'title-hl';
+    hl.textContent = item.title;
+    rowTitle.append(hl);
+  } else {
+    rowTitle.textContent = item.title;
+  }
 
   const sub = row.querySelector('.row-sub');
   const preview = firstLine(plainOf(item));
@@ -352,6 +362,7 @@ function addItem(title, body, extras = {}) {
     createdAt: now,
     updatedAt: now,
     bookmarked: !!extras.bookmarked,
+    marked: !!extras.marked,
   };
 
   state.items.push(item);
@@ -541,11 +552,24 @@ function updateTrash() {
 
 // The formatting bar above the keyboard. Its buttons must not take focus from the text.
 const fmtButtons = [...document.querySelectorAll('#fmtbar [data-cmd]')];
+const inTitle = () => document.activeElement === el.itemTitle;
 function syncToolbar() {
   if (!drawer) return;
+  // In the title only the highlighter works, and it marks the whole title
+  if (inTitle()) {
+    for (const b of fmtButtons) {
+      const m = b.dataset.cmd === 'm';
+      b.disabled = !m;
+      b.setAttribute('aria-pressed', String(m && drawer.marked));
+    }
+    return;
+  }
   const { type, bold, italic, mark } = editor.state();
   const on = { h: type === 'h', h3: type === 'h3', b: bold, i: italic, m: mark, li: type === 'li', task: type === 'task' };
-  for (const b of fmtButtons) b.setAttribute('aria-pressed', String(!!on[b.dataset.cmd]));
+  for (const b of fmtButtons) {
+    b.disabled = false;
+    b.setAttribute('aria-pressed', String(!!on[b.dataset.cmd]));
+  }
 }
 for (const eventName of ['pointerdown', 'mousedown']) {
   el.fmtbar.addEventListener(eventName, (e) => e.preventDefault());
@@ -553,6 +577,7 @@ for (const eventName of ['pointerdown', 'mousedown']) {
 el.fmtbar.addEventListener('click', (e) => {
   const cmd = e.target.closest('[data-cmd]')?.dataset.cmd;
   if (!cmd || !drawer) return;
+  if (inTitle()) { if (cmd === 'm') toggleTitleMark(); return; }
   if (cmd === 'b' || cmd === 'i' || cmd === 'm') editor.toggleInline(cmd); else editor.toggleType(cmd);
   syncToolbar();
 });
@@ -562,19 +587,40 @@ function setBookmark(on) {
   el.bookmark.setAttribute('aria-label', on ? 'Remove bookmark' : 'Bookmark');
 }
 
+// The highlighted title is a copy of the title behind the field, kept in step with it
+function syncTitleMark() {
+  el.titleField.classList.toggle('marked', !!drawer?.marked);
+  if (!drawer?.marked) return;
+  el.titleMark.className = 'title-hl';
+  el.titleMark.textContent = el.itemTitle.value;
+  el.titleMark.parentElement.scrollLeft = el.itemTitle.scrollLeft;
+}
+
+// Like the bookmark, a highlight isn't a change to the text, so it saves at once
+function toggleTitleMark() {
+  drawer.marked = !drawer.marked;
+  syncTitleMark();
+  syncToolbar();
+  if (drawer.mode === 'add') scheduleSave();
+  if (drawer.mode === 'edit') {
+    drawer.item.marked = drawer.marked;
+    save(db.put('items', drawer.item));
+  }
+}
+
 const dateStamp = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
 function showDrawer(mode, item) {
   // `original` is what the item looked like when it opened, so a swipe-down can put it back
   drawer = {
-    mode, item, pending: false, bookmarked: !!item?.bookmarked,
+    mode, item, pending: false, bookmarked: !!item?.bookmarked, marked: !!item?.marked,
     original: item && { title: item.title, body: item.body, updatedAt: item.updatedAt },
   };
   hideToast();
 
   const draft = mode === 'add' ? readDraft() : null; // an unfinished note comes back
-  if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.savedAt = draft.t; }
+  if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.marked = !!draft.marked; drawer.savedAt = draft.t; }
   el.itemTitle.value = item ? item.title : draft?.title ?? '';
   editor.setMarkdown(item ? item.body : draft?.body ?? '');
   drawer.canon = getBody(); // the saved text may differ from its tidied form; that alone is not an edit
@@ -582,6 +628,7 @@ function showDrawer(mode, item) {
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
   setBookmark(drawer.bookmarked);
+  syncTitleMark();
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
   setHint('');
@@ -634,6 +681,7 @@ function readEdits(item) {
   item.title = el.itemTitle.value.trim() || 'Untitled';
   item.body = getBody().trimEnd();
   item.bookmarked = drawer.bookmarked;
+  item.marked = drawer.marked;
   item.updatedAt = Date.now();
 }
 
@@ -644,7 +692,7 @@ function saveEdit() {
     const title = el.itemTitle.value;
     const body = getBody();
     const empty = !title.trim() && !body.trim();
-    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, t: Date.now() });
+    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marked: drawer.marked, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
     refreshHint();
     return;
@@ -685,7 +733,7 @@ function closeDrawer() {
   if (drawer.mode === 'add') {
     const title = el.itemTitle.value.trim();
     if (title) {
-      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked });
+      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked, marked: drawer.marked });
       writeDraft(null);
     }
   } else {
@@ -711,6 +759,7 @@ el.done.addEventListener('click', () => {
 });
 
 el.itemTitle.addEventListener('input', () => {
+  syncTitleMark();
   setHint('');
   updateTrash();
   scheduleSave();
@@ -727,6 +776,9 @@ el.bookmark.addEventListener('click', () => {
     save(db.put('items', drawer.item));
   }
 });
+
+el.itemTitle.addEventListener('scroll', syncTitleMark);
+for (const eventName of ['focus', 'blur']) el.itemTitle.addEventListener(eventName, syncToolbar);
 
 // Enter in the title moves to the description instead of submitting.
 el.itemTitle.addEventListener('keydown', (e) => {
@@ -1049,8 +1101,10 @@ el.trash.addEventListener('click', () => {
   el.itemTitle.value = '';
   editor.setMarkdown('');
   drawer.bookmarked = false;
+  drawer.marked = false;
   drawer.savedAt = 0;
   setBookmark(false);
+  syncTitleMark();
   updateTrash();
   refreshHint();
   el.itemTitle.focus();
@@ -2449,6 +2503,7 @@ function cleanItem(i, index) {
     body: typeof i.body === 'string' ? i.body.slice(0, 200000) : '',
     done: !!i.done,
     bookmarked: !!i.bookmarked,
+    marked: !!i.marked,
     order: num(i.order, index),
     createdAt: num(i.createdAt, now),
     updatedAt: num(i.updatedAt, now),
