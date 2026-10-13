@@ -373,22 +373,34 @@ h1, h2 {
   align-items: flex-start;
   gap: 6px;
   padding: 6px 20px 6px 8px;
-  border-top: 0.5px solid var(--line);
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
 
+/* A thin line between rows, strongest in the middle and fading out before the edges, so
+   the edges stay clean. None above the first row. */
+.row + .row::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--line-strong) 50%, transparent);
+  pointer-events: none;
+}
+
+.row.selected::after,
+.row.selected + .row::after {
+  display: none;
+}
+
 /* Long-press selects a row. A selected row has a gold circle and a lighter background. */
 .row.selected {
-  border-top-color: transparent;
   margin: 0 8px;
   padding-left: 0;
   padding-right: 12px;
-}
-
-.row.selected + .row {
-  border-top-color: transparent;
 }
 
 .row.selected::before {
@@ -972,20 +984,9 @@ h1, h2 {
   display: flex;
 }
 
-/* Done, at the start of the top bar at every height: the same circle as the note's row */
-.meta-done {
-  margin: 0 2px 0 -10px; /* lines the circle up with the title below */
-}
-
-.meta-done[hidden] { display: none; }
-
-.meta-done[aria-checked='true'] .circle {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.meta-done[aria-checked='true'] .circle .icon { display: block; }
+/* "Completed" leads the hint when the note is ticked off, with a dot before the saved time */
+#hint-done { color: var(--text); }
+#hint-done.then::after { content: '\00b7'; margin: 0 6px; color: var(--text-muted); }
 
 /* Toast: a short message with an optional Undo */
 .toast {
@@ -1932,7 +1933,7 @@ h1, h2 {
   border-radius: var(--wobble-round);
 }
 
-[data-style='sketch'] :is(.row.done, .meta-done[aria-checked='true']) .circle { border-color: var(--ink); }
+[data-style='sketch'] .row.done .circle { border-color: var(--ink); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */
@@ -1941,8 +1942,13 @@ h1, h2 {
 [data-style='sketch'] .menu hr { border-top: 2px dashed var(--line); }
 
 /* Dashed rules between rows */
-[data-style='sketch'] .row { border-top: 2px dashed var(--line); }
-[data-style='sketch'] :is(.row.selected, .row.selected + .row) { border-top-color: transparent; }
+[data-style='sketch'] .row + .row::after {
+  height: 0;
+  background: none;
+  border-top: 2px dashed var(--line);
+  mask: linear-gradient(to right, transparent, #000 30%, #000 70%, transparent);
+  -webkit-mask: linear-gradient(to right, transparent, #000 30%, #000 70%, transparent);
+}
 [data-style='sketch'] .row.selected::before,
 [data-style='sketch'] .arch-row.picked { border-radius: 14px 11px 15px 10px / 10px 15px 11px 14px; }
 

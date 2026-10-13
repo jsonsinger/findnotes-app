@@ -208,15 +208,12 @@
     <section class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="New item">
         <button class="grab" id="grab" aria-label="Expand note" aria-expanded="false"><span></span></button>
         <div class="drawer-top" id="drawer-top">
-            <button class="check meta-done" id="meta-done" role="checkbox" aria-checked="false" aria-label="Done" hidden>
-                <span class="circle"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span>
-            </button>
-            <span id="hint"><svg class="icon hint-icon" id="hint-icon" aria-hidden="true" hidden><use href="#i-clock"/></svg><span id="hint-text"></span></span>
+            <span id="hint"><span id="hint-done" hidden>Completed</span><svg class="icon hint-icon" id="hint-icon" aria-hidden="true" hidden><use href="#i-clock"/></svg><span id="hint-text"></span></span>
             <span class="drawer-actions">
                 <button class="icon-btn" id="trash" aria-label="Clear draft" hidden>
                     <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
                 </button>
-                <button class="icon-btn" id="bookmark" aria-label="Bookmark" aria-pressed="false">
+                <button class="icon-btn" id="bookmark" aria-label="Bookmark" aria-pressed="false" hidden>
                     <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
                 </button>
                 <button class="icon-btn" id="done" aria-label="Add" data-state="plus">

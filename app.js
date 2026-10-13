@@ -36,7 +36,7 @@ const el = {
   bookmark: $('bookmark'),
   metaDate: $('meta-date'),
   metaList: $('meta-list'),
-  metaDone: $('meta-done'),
+  hintDone: $('hint-done'),
   toast: $('toast'),
   menuBtn: $('menu-btn'),
   menuScrim: $('menu-scrim'),
@@ -479,6 +479,9 @@ function refreshHint() {
   const saved = hintError ? '' : savedText();
   el.hintText.textContent = hintError || saved;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
+  // A ticked-off note says so first: "Completed · Saved 2 min ago"
+  el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
+  el.hintDone.classList.toggle('then', !!saved);
 }
 
 // "Saved just now" / "Saved 2 min ago" (for a new note: "Draft saved ..."). It stays while you
@@ -568,8 +571,6 @@ function showDrawer(mode, item) {
   updateTrash();
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
-  el.metaDone.hidden = mode !== 'edit';
-  el.metaDone.setAttribute('aria-checked', String(!!item?.done));
   setBookmark(drawer.bookmarked);
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
@@ -695,16 +696,6 @@ el.itemTitle.addEventListener('input', () => {
   setHint('');
   updateTrash();
   scheduleSave();
-});
-
-// The top bar shows whether the note is done, and it can be ticked or unticked there too.
-el.metaDone.addEventListener('click', () => {
-  if (drawer?.mode !== 'edit') return;
-  const item = drawer.item;
-  item.done = !item.done;
-  el.metaDone.setAttribute('aria-checked', String(item.done));
-  save(db.put('items', item));
-  render();
 });
 
 el.bookmark.addEventListener('click', () => {
