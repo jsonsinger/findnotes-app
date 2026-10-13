@@ -945,8 +945,7 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* The confirm glyph: a gold plus when adding, otherwise a tick (in the gold circle once the
-   note is done). */
+/* The confirm glyph: a gold plus when adding, otherwise a tick in a gold circle. */
 #done {
   color: var(--text);
 }
@@ -962,10 +961,13 @@ h1, h2 {
   stroke-width: 2.2;
 }
 
-/* A completed note: the same gold circle and dark tick as its row in the list */
-#done[data-completed] { position: relative; }
+/* Editing: the same gold circle and dark tick as a done row, always (the hint says Completed) */
+#done[data-circle] { position: relative; transition: opacity 0.2s; }
 
-#done[data-completed]::before {
+/* While saving, the tick dims, then comes back */
+.drawer-top.saving #done { opacity: 0.4; }
+
+#done[data-circle]::before {
   content: '';
   position: absolute;
   inset: 8px;
@@ -974,7 +976,7 @@ h1, h2 {
   background: var(--accent);
 }
 
-#done[data-completed] .icon {
+#done[data-circle] .icon {
   position: relative;
   width: 16px;
   height: 16px;
@@ -1957,8 +1959,8 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
-[data-style='sketch'] #done[data-completed]::before { display: none; } /* Sketch's tick is already drawn in a circle */
-[data-style='sketch'] #done[data-completed] { background: var(--accent); }
+[data-style='sketch'] #done[data-circle]::before { display: none; } /* Sketch's tick is already drawn in a circle */
+[data-style='sketch'] #done[data-circle] { background: var(--accent); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */

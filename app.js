@@ -462,7 +462,8 @@ let drawer = null;
 let saveTimer = null;
 let maxTimer = null;
 const AUTOSAVE_IDLE_MS = 5000;  // editing saves itself 5 seconds after you pause...
-const AUTOSAVE_MAX_MS = 60000;  // ...or a minute after the first unsaved change, however long you type
+const AUTOSAVE_MAX_MS = 60000;
+const SAVING_MIN_MS = 700; // how long "Saving..." shows at least  // ...or a minute after the first unsaved change, however long you type
 const cancelSave = () => { clearTimeout(saveTimer); clearTimeout(maxTimer); saveTimer = maxTimer = null; };
 
 let hintError = '';
@@ -476,11 +477,15 @@ function setHint(message, isError = false) {
 
 // An error wins; otherwise it says when the note was last saved.
 function refreshHint() {
-  // Editing a note: until autosave catches up, say so instead of the last saved time
-  const unsaved = !hintError && drawer?.mode === 'edit' && drawer.pending;
-  const saved = hintError ? '' : unsaved ? 'Unsaved changes' : savedText();
+  // Editing a note: "Unsaved changes" until autosave starts, "Saving..." while it runs,
+  // then the last saved time again
+  const editing = !hintError && drawer?.mode === 'edit';
+  const unsaved = editing && drawer.pending;
+  const saving = editing && !unsaved && !!drawer.saving;
+  const saved = hintError ? '' : unsaved ? 'Unsaved changes' : saving ? 'Saving\u2026' : savedText();
   el.hintText.textContent = hintError || saved;
   el.foot.classList.toggle('unsaved', unsaved);
+  el.foot.classList.toggle('saving', saving);
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
   el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
@@ -516,12 +521,12 @@ function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
 }
 
-// Gold plus: adding. Otherwise a tick, filled gold once the note is done. The state still marks
-// unsaved changes, for the label.
+// Gold plus: adding. Otherwise a dark tick in a gold circle. The state still marks unsaved
+// changes, for the label.
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
-  el.done.toggleAttribute('data-completed', !adding && !!drawer?.item?.done); // the gold circle, like the list
+  el.done.toggleAttribute('data-circle', !adding && !!drawer); // a gold circle whether or not it is done; "Completed" says which
   el.doneIcon.setAttribute('href', adding ? '#i-plus' : '#i-check');
   const label = adding ? 'Add' : drawer?.pending ? 'Save and close' : 'Close';
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
@@ -651,9 +656,17 @@ function saveEdit() {
   drawer.original = { title: drawer.item.title, body: drawer.item.body, updatedAt: drawer.item.updatedAt };
   drawer.canon = drawer.item.body;
   drawer.savedAt = Date.now();
+  drawer.saving = true;
   updateCommit();
   refreshHint();
-  save(db.put('items', drawer.item));
+  // "Saving..." stays up a moment even though the write is near instant, so it can be seen
+  const sheet = drawer;
+  const shown = new Promise((resolve) => setTimeout(resolve, SAVING_MIN_MS));
+  Promise.all([save(db.put('items', drawer.item)), shown]).then(() => {
+    if (drawer !== sheet) return; // closed, or another note opened
+    sheet.saving = false;
+    refreshHint();
+  });
 }
 
 // Two clocks: the idle one restarts on every keystroke, the other starts at the first
