@@ -1075,6 +1075,7 @@ function dismissDrawer() {
 
   const edited = { title: title.trim() || 'Untitled', body: body.trimEnd() };
   if (edited.title === original.title && edited.body === drawer.canon) {
+    render(); // a highlight saves at once, so the list may still need to show it
     hideDrawer();
     return;
   }
