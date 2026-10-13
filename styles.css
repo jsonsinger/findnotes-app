@@ -960,6 +960,30 @@ h1, h2 {
   stroke-width: 2.2;
 }
 
+/* A completed note: the same gold circle and dark tick as its row in the list. With changes
+   still waiting to be saved it is a gold ring around a gold tick, the circle not yet filled. */
+#done[data-completed] { position: relative; }
+
+#done[data-completed]::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 1.8px solid var(--accent);
+  background: var(--accent);
+}
+
+#done[data-completed] .icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.6;
+  color: var(--on-accent);
+}
+
+#done[data-completed][data-state='pending']::before { background: none; }
+#done[data-completed][data-state='pending'] .icon { color: var(--accent-text); }
+
 #bookmark[aria-pressed='true'] {
   color: var(--text-muted);
 }
@@ -985,7 +1009,7 @@ h1, h2 {
 }
 
 /* "Completed" leads the hint when the note is ticked off, with a dot before the saved time */
-#hint-done { color: var(--text); }
+#hint-done { color: var(--text-muted); }
 #hint-done.then::after { content: '\00b7'; margin: 0 6px; color: var(--text-muted); }
 
 /* Toast: a short message with an optional Undo */
@@ -1934,6 +1958,8 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] #done[data-completed]::before { display: none; } /* Sketch's tick is already drawn in a circle */
+[data-style='sketch'] #done[data-completed]:not([data-state='pending']) { background: var(--accent); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */

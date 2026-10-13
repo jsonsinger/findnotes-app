@@ -517,6 +517,7 @@ function syncMeta() {
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
+  el.done.toggleAttribute('data-completed', !adding && !!drawer?.item?.done); // the gold circle, like the list
   el.doneIcon.setAttribute('href', adding ? '#i-plus' : '#i-check');
   const label = adding ? 'Add' : drawer?.pending ? 'Save and close' : 'Close';
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
