@@ -227,15 +227,18 @@
                 </button>
             </span>
         </div>
-        <div class="title-field" id="title-field">
-            <span class="title-mark" aria-hidden="true"><span id="title-mark"></span></span>
-            <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
+        <!-- On a full-page note the title, list and note scroll together under the top bar -->
+        <div class="note-scroll" id="note-scroll">
+            <div class="title-field" id="title-field">
+                <span class="title-mark" aria-hidden="true"><span id="title-mark"></span></span>
+                <input id="item-title" type="text" placeholder="What do you need to do?" autocomplete="off" enterkeyhint="next">
+            </div>
+            <div class="meta" id="meta">
+                <span class="meta-list"><svg class="icon meta-icon" aria-hidden="true"><use id="meta-icon" href="#i-list"/></svg><span id="meta-list"></span></span>
+                <span id="meta-date"></span>
+            </div>
+            <div id="item-body" aria-label="Description"></div>
         </div>
-        <div class="meta" id="meta">
-            <span class="meta-list"><svg class="icon meta-icon" aria-hidden="true"><use id="meta-icon" href="#i-list"/></svg><span id="meta-list"></span></span>
-            <span id="meta-date"></span>
-        </div>
-        <div id="item-body" aria-label="Description"></div>
         <div class="fmtbar" id="fmtbar" role="toolbar" aria-label="Formatting">
             <button data-cmd="h" aria-label="Heading" aria-pressed="false"><span class="fmt-h">H<sub>2</sub></span></button>
             <button data-cmd="h3" aria-label="Smaller heading" aria-pressed="false"><span class="fmt-h">H<sub>3</sub></span></button>

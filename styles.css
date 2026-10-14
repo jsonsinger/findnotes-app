@@ -773,6 +773,34 @@ h1, h2 {
   overflow-wrap: anywhere;
 }
 
+/* The title, list and note. On a small sheet only the description scrolls; on a full-page
+   note they all scroll together, leaving the save status and close button pinned above. */
+.note-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.note-scroll::-webkit-scrollbar { display: none; }
+
+.drawer.show-meta .note-scroll {
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
+.drawer.show-meta #item-body {
+  flex: 1 0 auto;
+  overflow: visible;
+}
+
+/* Full page: the handle tucks in closer to the top bar to leave the note more room */
+.drawer.show-meta .grab { height: 18px; }
+.drawer.show-meta .grab span { margin-top: 7px; }
+
 /* A sheet smaller than the screen moves with the finger instead of scrolling the note (see app.js) */
 .drawer.small #item-body { touch-action: none; }
 

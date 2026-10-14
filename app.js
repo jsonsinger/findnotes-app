@@ -30,6 +30,7 @@ const el = {
   titleField: $('title-field'),
   titleMark: $('title-mark'),
   itemBody: $('item-body'),
+  noteScroll: $('note-scroll'),
   foot: $('drawer-top'),
   hintIcon: $('hint-icon'),
   hintText: $('hint-text'),
@@ -531,7 +532,11 @@ const getBody = () => editor.getMarkdown();
 
 function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
+  if (!expanded) el.noteScroll.scrollTop = 0; // a smaller sheet starts at the title again
 }
+
+// What scrolls the note: the whole page (title and all) when full-page, the description otherwise
+const noteScroller = () => (expanded ? el.noteScroll : el.itemBody);
 
 // Adding: a gold + in a soft circle. Editing: an × (closing saves anything pending). Either one
 // draws a spinning arc while autosave runs and a ring and tick once it has (see refreshHint).
@@ -1054,9 +1059,10 @@ function revealCaret() {
       const node = sel.focusNode.nodeType === 1 ? sel.focusNode : sel.focusNode.parentElement;
       rect = (node.closest('.b') || node).getBoundingClientRect();
     }
-    const box = el.itemBody.getBoundingClientRect();
-    if (rect.bottom > box.bottom - CARET_MARGIN) el.itemBody.scrollTop += rect.bottom - box.bottom + CARET_MARGIN;
-    else if (rect.top < box.top) el.itemBody.scrollTop -= box.top - rect.top;
+    const scroller = noteScroller();
+    const box = scroller.getBoundingClientRect();
+    if (rect.bottom > box.bottom - CARET_MARGIN) scroller.scrollTop += rect.bottom - box.bottom + CARET_MARGIN;
+    else if (rect.top < box.top) scroller.scrollTop -= box.top - rect.top;
   });
 }
 
@@ -1164,7 +1170,7 @@ el.drawer.addEventListener('touchmove', (e) => {
     const full = !el.drawer.classList.contains('small');
     const sel = getSelection();
     const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
-    const atTop = !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
+    const atTop = expanded ? el.noteScroll.scrollTop <= 0 : !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
     if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
     measureFull();
     noteSwipe.moved = true;
