@@ -85,6 +85,9 @@
     </symbol>
     <symbol id="i-bullets" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/></g><g fill="currentColor"><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></g></symbol>
     <symbol id="i-task" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12.3l2.7 2.7L16.2 9.4"/></g></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24">
+        <path d="M7 3.5h10M7 20.5h10M8.5 3.5c0 4.5 3.5 5 3.5 8.5s-3.5 4-3.5 8.5M15.5 3.5c0 4.5-3.5 5-3.5 8.5s3.5 4 3.5 8.5"/>
+    </symbol>
     <symbol id="i-close" viewBox="0 0 24 24">
         <path d="M6 6l12 12M18 6L6 18"/>
     </symbol>
@@ -220,7 +223,7 @@
                     <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
                 </button>
                 <button class="icon-btn" id="done" aria-label="Add" data-state="plus">
-                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><span class="done-label" aria-hidden="true">Done</span>
+                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><span class="done-glyphs" aria-hidden="true"><svg class="icon g-close"><use href="#i-close"/></svg><svg class="icon g-wait"><use href="#i-hourglass"/></svg><svg class="icon g-tick"><use href="#i-check"/></svg></span>
                 </button>
             </span>
         </div>

@@ -1011,36 +1011,55 @@ h1, h2 {
   stroke-width: 2.2;
 }
 
-.done-label { display: none; }
+/* Editing: an × in a soft circle. While autosave runs it becomes a turning hourglass, then
+   a tick for a moment, then the × again. The glyphs sit on top of each other and cross-fade. */
+.done-glyphs { display: none; }
 
-/* Editing: "Done" saves and closes. Grey when everything is saved, gold while changes wait
-   (the hint says "Unsaved changes"), dimmed while saving. */
-#done[data-pill] {
-  width: auto;
-  padding: 0 2px 0 8px;
-  transition: opacity 0.2s;
-}
+#done[data-phase] { position: relative; isolation: isolate; }
+#done[data-phase] > .icon { display: none; }
 
-#done[data-pill] .icon { display: none; }
-
-#done[data-pill] .done-label {
-  display: block;
-  padding: 8px 15px;
-  border-radius: 999px;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1;
+#done[data-phase]::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
   background: var(--surface);
-  color: var(--text);
-  transition: background-color 0.2s, color 0.2s;
+  z-index: -1;
 }
 
-.drawer-top:is(.unsaved, .saving) #done[data-pill] .done-label {
-  background: var(--accent);
-  color: var(--on-accent);
+#done[data-phase] .done-glyphs { display: grid; }
+
+.done-glyphs .icon {
+  grid-area: 1 / 1;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.4;
+  color: var(--text-muted);
+  opacity: 0;
+  transform: scale(0.5) rotate(-60deg);
+  transition: opacity 0.2s, transform 0.25s;
 }
 
-.drawer-top.saving #done { opacity: 0.4; }
+.done-glyphs .g-tick { color: var(--accent-text); stroke-width: 2.8; }
+
+#done[data-phase='close'] .g-close,
+#done[data-phase='saving'] .g-wait,
+#done[data-phase='saved'] .g-tick {
+  opacity: 1;
+  transform: none;
+}
+
+#done[data-phase='saving'] .g-wait { animation: hourglass 0.7s ease-in-out infinite; }
+
+@keyframes hourglass {
+  0%, 20% { transform: rotate(0deg); }
+  80%, 100% { transform: rotate(180deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .done-glyphs .icon { transition: opacity 0.2s; transform: none; }
+  #done[data-phase='saving'] .g-wait { animation: none; }
+}
 
 #bookmark[aria-pressed='true'] {
   color: var(--text-muted);
@@ -2056,8 +2075,7 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
-[data-style='sketch'] #done[data-pill] { border: 0; }
-[data-style='sketch'] #done[data-pill] .done-label { border: var(--ink-line); border-radius: var(--wobble); }
+[data-style='sketch'] #done[data-phase]::before { display: none; } /* Sketch draws its own wobbly circle */
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */

@@ -466,7 +466,9 @@ let saveTimer = null;
 let maxTimer = null;
 const AUTOSAVE_IDLE_MS = 5000;  // editing saves itself 5 seconds after you pause...
 const AUTOSAVE_MAX_MS = 60000;
-const SAVING_MIN_MS = 700; // how long "Saving..." shows at least  // ...or a minute after the first unsaved change, however long you type
+const SAVING_MIN_MS = 700; // how long "Saving..." shows at least
+const SAVED_TICK_MS = 1200; // how long the close button shows a tick after a save
+let savedTickTimer = 0;  // ...or a minute after the first unsaved change, however long you type
 const cancelSave = () => { clearTimeout(saveTimer); clearTimeout(maxTimer); saveTimer = maxTimer = null; };
 
 let hintError = '';
@@ -489,6 +491,9 @@ function refreshHint() {
   el.hintText.textContent = hintError || saved;
   el.foot.classList.toggle('unsaved', unsaved);
   el.foot.classList.toggle('saving', saving);
+  // The close button tells the same story: × , hourglass while saving, a tick for a moment after
+  if (drawer?.mode === 'edit') el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : 'close';
+  else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
   el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
@@ -524,14 +529,13 @@ function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
 }
 
-// Gold plus: adding. Editing: a "Done" button (save and close), grey when everything is saved
-// and gold while changes wait for autosave.
+// Gold plus: adding. Editing: an × in a soft circle (closing saves anything pending), which
+// turns into an hourglass while autosave runs and a tick once it has, then back to × (see refreshHint).
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
-  el.done.toggleAttribute('data-pill', !adding && !!drawer); // editing: a "Done" button, gold while there is something to save
   el.doneIcon.setAttribute('href', '#i-plus');
-  const label = adding ? 'Add' : 'Done';
+  const label = adding ? 'Add' : 'Close';
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
 }
 
@@ -773,7 +777,14 @@ function saveEdit() {
   Promise.all([save(db.put('items', drawer.item)), shown]).then(() => {
     if (drawer !== sheet) return; // closed, or another note opened
     sheet.saving = false;
+    sheet.justSaved = true;
     refreshHint();
+    clearTimeout(savedTickTimer);
+    savedTickTimer = setTimeout(() => {
+      if (drawer !== sheet) return;
+      sheet.justSaved = false;
+      refreshHint();
+    }, SAVED_TICK_MS);
   });
 }
 
