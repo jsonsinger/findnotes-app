@@ -24,7 +24,6 @@ const el = {
   list: $('list'),
   add: $('add'),
   scrim: $('scrim'),
-  statusTint: $('status-tint'),
   drawer: $('drawer'),
   trash: $('trash'),
   itemTitle: $('item-title'),
@@ -954,7 +953,6 @@ function setSheet(h) {
 
   el.drawer.classList.toggle('small', h < full - 2); // until it fills the screen, the note doesn't scroll
   const isExpanded = h > (PEEK + full) / 2;
-  el.statusTint.classList.toggle('dim', h > PEEK / 2 && !isExpanded);
   if (isExpanded !== expanded) {
     expanded = isExpanded;
     syncMeta();
