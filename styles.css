@@ -30,6 +30,7 @@
   --line: rgba(255, 255, 255, 0.1);
   --line-strong: rgba(255, 255, 255, 0.24);
   --scrim: rgba(0, 0, 0, 0.55);
+  --scrim-solid: #090b0c; /* --bg under --scrim, as one plain colour for the status bar */
   --danger: #ff7b6e;
   --toast-bg: #2a2e32;
   --toast-text: #f2f1ea;
@@ -60,6 +61,7 @@
   --line: rgba(21, 24, 26, 0.1);
   --line-strong: rgba(21, 24, 26, 0.2);
   --scrim: rgba(21, 24, 26, 0.25);
+  --scrim-solid: #c2c2c2;
   --danger: #b3261e;
   --toast-bg: #15181a;
   --toast-text: #f2f1ea;
@@ -648,11 +650,10 @@ h1, h2 {
    there left the status bar dark after the drawer closed. */
 .scrim {
   position: absolute;
-  inset: 0; /* up under the status bar too, so the time and battery dim with the app */
+  inset: env(safe-area-inset-top, 0px) 0 0; /* the status bar has its own layer, .status-tint */
   touch-action: none; /* dragging the dimmed background must not pull the page to refresh */
   /* iOS 26 tints the status bar from the background-color of fixed layers near the top, and
-     keeps that tint after they hide. Painting the dim as an image leaves nothing for it to pick
-     up, so the status bar dims with the scrim's own pixels and clears when it fades. */
+     keeps that tint after they hide. Painting the dim as an image leaves nothing for it to pick up. */
   background-color: transparent;
   background-image: linear-gradient(var(--scrim), var(--scrim));
   opacity: 0;
@@ -662,6 +663,25 @@ h1, h2 {
 
 .scrim.open {
   visibility: visible;
+}
+
+/* What iOS 26 colours the status bar from. It never hides, it only changes colour (iOS follows
+   a colour change but not a layer going away): dimmed while the drawer is up, the page again
+   when it closes or fills the screen. JavaScript sets .dim (setSheet). */
+.status-tint {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--bg);
+  pointer-events: none;
+  z-index: 4;
+  transition: background-color 0.2s ease;
+}
+
+.status-tint.dim {
+  background-color: var(--scrim-solid);
 }
 
 /* No grey flash behind a field or button when you press it */
@@ -2096,6 +2116,7 @@ h1, h2 {
    Caveat for anything you'd write by hand (titles, buttons, labels), Karla for reading. */
 :root[data-style='sketch'] {
   --bg: #f8f8ff;
+  --scrim-solid: #bfbfc6;
   --surface: #ffffff;
   --bar-bg: #ffffff;
   --popover-bg: #ffffff;
