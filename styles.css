@@ -678,7 +678,7 @@ h1, h2 {
   padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 10px);
   padding-top: calc(env(safe-area-inset-top, 0px) * var(--full));
   background: var(--bg);
-  border-top: 0.5px solid var(--line-strong);
+  border-top: calc(0.5px * (1 - var(--full))) solid var(--line-strong); /* no line once it fills the screen */
   border-radius: calc(18px * (1 - var(--full))) calc(18px * (1 - var(--full))) 0 0;
   visibility: hidden;
   touch-action: none; /* only the description scrolls, see #item-body */
