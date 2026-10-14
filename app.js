@@ -78,6 +78,7 @@ const el = {
   selX: $('sel-x'),
   bannerAction: $('banner-action'),
   fmtbar: $('fmtbar'),
+  addItem: $('add-item'),
   themeSeg: $('theme-seg'),
   iconsSwitch: $('icons-switch'),
   sketchSwitch: $('sketch-switch'),
@@ -497,7 +498,7 @@ function refreshHint() {
   el.foot.classList.toggle('saving', saving);
   // The button tells the same story: × (or + for a new note), a spinning arc while saving,
   // a ring and tick for a moment after
-  if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : adding ? 'add' : 'close';
+  if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : 'close';
   else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
@@ -538,14 +539,12 @@ function syncMeta() {
 // What scrolls the note: the whole page (title and all) when full-page, the description otherwise
 const noteScroller = () => (expanded ? el.noteScroll : el.itemBody);
 
-// Adding: a gold + in a soft circle. Editing: an × (closing saves anything pending). Either one
-// draws a spinning arc while autosave runs and a ring and tick once it has (see refreshHint).
+// Top right is always an × in a soft circle: closing saves anything pending (a new item keeps
+// it as the draft). It draws a spinning arc while autosave runs and a ring and tick once it has
+// (see refreshHint). A new item is added with the gold Add button at the bottom.
 function updateCommit() {
-  const adding = drawer?.mode === 'add';
-  el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
-  el.doneIcon.setAttribute('href', '#i-plus');
-  const label = adding ? 'Add' : 'Close';
-  if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
+  el.done.dataset.state = drawer?.pending ? 'pending' : 'saved';
+  el.addItem.hidden = drawer?.mode !== 'add';
 }
 
 // Only a new note with something in it has an eraser (clear the draft). Archiving happens
@@ -838,13 +837,21 @@ el.add.addEventListener('click', openAdd);
 el.scrim.addEventListener('click', dismissDrawer);
 
 el.done.addEventListener('click', () => {
-  if (drawer?.mode === 'add' && !el.itemTitle.value.trim()) {
+  if (drawer?.mode === 'add') dismissDrawer(); // keeps what you typed as the draft
+  else closeDrawer();
+});
+
+el.addItem.addEventListener('click', () => {
+  if (drawer?.mode !== 'add') return;
+  if (!el.itemTitle.value.trim()) {
     setHint('Enter a title first', true);
     el.itemTitle.focus();
     return;
   }
   closeDrawer();
 });
+// Like the formatting buttons, Add must not take focus: the keyboard would drop and the sheet jump
+el.addItem.addEventListener('pointerdown', (e) => e.preventDefault());
 
 el.itemTitle.addEventListener('input', () => {
   shiftMarks(drawer.titleWas, el.itemTitle.value);
@@ -1087,7 +1094,8 @@ addEventListener('resize', () => { measureFull(); fitViewport(); });
 // the touch handlers below), so the whole sheet answers a swipe like one piece.
 el.drawer.addEventListener('pointerdown', (e) => {
   if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
+  // The whole top bar is a handle, buttons included: a tap still presses them, a drag moves the sheet
+  if (!e.target.closest('.grab, .drawer-top')) return;
   measureFull();
   drag = { id: e.pointerId, y: e.clientY, h: sheetH, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
 });
@@ -1166,12 +1174,19 @@ el.drawer.addEventListener('touchmove', (e) => {
   const y = e.touches[0].clientY;
   if (!noteSwipe.moved) {
     const dy = y - noteSwipe.y; // down is positive
+    if (!dy) return;
+    // Decide on the first movement: iOS commits to scrolling the note on that touchmove, and
+    // after that it can't be cancelled, which made pulling a full note down hit and miss.
+    if (!noteSwipe.claimed) {
+      const full = !el.drawer.classList.contains('small');
+      const sel = getSelection();
+      const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
+      const atTop = expanded ? el.noteScroll.scrollTop <= 0 : !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
+      if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
+      noteSwipe.claimed = true;
+    }
+    e.preventDefault();
     if (Math.abs(dy) < 6) return; // still might be a tap
-    const full = !el.drawer.classList.contains('small');
-    const sel = getSelection();
-    const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
-    const atTop = expanded ? el.noteScroll.scrollTop <= 0 : !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
-    if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
     measureFull();
     noteSwipe.moved = true;
     noteSwipe.fromNote = true;
@@ -1200,6 +1215,14 @@ document.addEventListener('touchmove', (e) => {
 
 el.drawer.addEventListener('pointerup', endDrag);
 el.drawer.addEventListener('pointercancel', endDrag);
+
+// The end of a drag that started on a top-bar button is not a press of that button
+el.drawer.addEventListener('click', (e) => {
+  if (performance.now() - lastDragEnd < 400 && e.target.closest('.drawer-top button')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
 
 // Tapping the handle toggles between small and full.
 el.grab.addEventListener('click', () => {

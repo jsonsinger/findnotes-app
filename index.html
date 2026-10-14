@@ -222,8 +222,8 @@
                 <button class="icon-btn" id="bookmark" aria-label="Bookmark" aria-pressed="false" hidden>
                     <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
                 </button>
-                <button class="icon-btn" id="done" aria-label="Add" data-state="plus">
-                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-p m-p1" d="M14 8.5v11"/><path class="m-p m-p2" d="M8.5 14h11"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
+                <button class="icon-btn" id="done" aria-label="Close">
+                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
                 </button>
             </span>
         </div>
@@ -239,6 +239,8 @@
             </div>
             <div id="item-body" aria-label="Description"></div>
         </div>
+        <!-- Bottom row: formatting once full-page, and the Add button for a new item -->
+        <div class="drawer-foot">
         <div class="fmtbar" id="fmtbar" role="toolbar" aria-label="Formatting">
             <button data-cmd="h" aria-label="Heading" aria-pressed="false"><span class="fmt-h">H<sub>2</sub></span></button>
             <button data-cmd="h3" aria-label="Smaller heading" aria-pressed="false"><span class="fmt-h">H<sub>3</sub></span></button>
@@ -247,6 +249,8 @@
             <button data-cmd="li" aria-label="Bulleted list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bullets"/></svg></button>
             <button data-cmd="task" aria-label="Tick box list" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-task"/></svg></button>
             <button data-cmd="m" aria-label="Highlight" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg></button>
+        </div>
+        <button class="add-item" id="add-item" hidden><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Add<span class="add-item-more">item</span></button>
         </div>
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
