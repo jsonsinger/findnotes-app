@@ -643,14 +643,15 @@ h1, h2 {
 /* Drawer: the sheet you drag up or down to add or edit an item.
    Its height and position are set from JavaScript while you drag (setSheet),
    so there are no CSS transitions on it. .open only decides if it is visible. */
-/* The dimming starts below the time and battery. iOS 26 colours the status bar from whatever
-   sits at the top edge of the screen and doesn't look again when it goes away, so a scrim up
-   there left the status bar dark after the drawer closed. */
+/* The dimming behind the drawer, up under the time and battery too. */
 .scrim {
   position: absolute;
-  inset: env(safe-area-inset-top, 0px) 0 0;
+  inset: 0;
   touch-action: none; /* dragging the dimmed background must not pull the page to refresh */
-  background: var(--scrim);
+  /* iOS 26 colours the status bar from this layer's background-color, and keeps that colour
+     after the layer hides. So once the drawer has gone (.open removed), the colour goes back to
+     the page's own, and the status bar follows it. */
+  background-color: var(--bg);
   opacity: 0;
   visibility: hidden;
   z-index: 4;
@@ -658,6 +659,7 @@ h1, h2 {
 
 .scrim.open {
   visibility: visible;
+  background-color: var(--scrim);
 }
 
 /* No grey flash behind a field or button when you press it */
