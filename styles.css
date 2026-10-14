@@ -1011,9 +1011,11 @@ h1, h2 {
   stroke-width: 2.2;
 }
 
-/* Editing: an × in a soft circle. While autosave runs it becomes a spinning circular arrow,
-   then a tick for a moment, then the × again. The glyphs sit on top of each other and cross-fade. */
-.done-glyphs { display: none; }
+/* Editing: an × in a soft circle, drawn as one SVG whose lines draw in and out.
+   While autosave runs the × draws away and a spinning arc draws in; when the save lands
+   the arc closes into a gold ring and a tick draws itself; then both draw away and the × returns.
+   Dash lengths match each path: ring 2πr ≈ 69.2, × strokes ≈ 11.4, tick ≈ 13.2. */
+.done-morph { display: none; }
 
 #done[data-phase] { position: relative; isolation: isolate; }
 #done[data-phase] > .icon { display: none; }
@@ -1027,37 +1029,63 @@ h1, h2 {
   z-index: -1;
 }
 
-#done[data-phase] .done-glyphs { display: grid; }
+#done[data-phase] .done-morph { display: block; }
 
-.done-glyphs .icon {
-  grid-area: 1 / 1;
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.4;
-  color: var(--text-muted);
+.done-morph {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.done-morph .m-ring {
+  stroke-dasharray: 69.2;
+  stroke-dashoffset: 69.2;
   opacity: 0;
-  transform: scale(0.5) rotate(-60deg);
-  transition: opacity 0.2s, transform 0.25s;
+  transform-origin: 14px 14px;
+  transform: rotate(-90deg);
+  /* Paused (not removed) outside saving, so the arc never snaps back to its starting angle */
+  animation: spin-arc 0.9s linear infinite paused;
+  transition: stroke-dashoffset 0.35s ease-out, opacity 0.25s, stroke 0.25s;
 }
 
-.done-glyphs .g-tick { color: var(--accent-text); stroke-width: 2.8; }
-
-#done[data-phase='close'] .g-close,
-#done[data-phase='saving'] .g-wait,
-#done[data-phase='saved'] .g-tick {
-  opacity: 1;
-  transform: none;
+.done-morph .m-x {
+  stroke-width: 2.2;
+  stroke-dasharray: 11.4;
+  stroke-dashoffset: 11.4;
+  transition: stroke-dashoffset 0.2s ease-in;
 }
 
-#done[data-phase='saving'] .g-wait { animation: spin 0.8s linear infinite; }
+.done-morph .m-tick {
+  stroke: var(--accent-text);
+  stroke-width: 2.4;
+  stroke-dasharray: 13.2;
+  stroke-dashoffset: 13.2;
+  transition: stroke-dashoffset 0.15s ease-in;
+}
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* × draws back in once the tick has gone, second stroke a beat after the first */
+#done[data-phase='close'] .m-x { stroke-dashoffset: 0; transition: stroke-dashoffset 0.22s ease-out 0.15s; }
+#done[data-phase='close'] .m-x2 { transition-delay: 0.25s; }
+/* the ring fades rather than unwinding, then quietly resets for the next save */
+#done[data-phase='close'] .m-ring { transition: opacity 0.25s, stroke 0.25s, stroke-dashoffset 0s 0.3s; }
+
+#done[data-phase='saving'] .m-ring { stroke-dashoffset: 46; opacity: 1; animation-play-state: running; }
+
+#done[data-phase='saved'] .m-ring { stroke-dashoffset: 0; opacity: 1; stroke: var(--accent-text); }
+#done[data-phase='saved'] .m-tick { stroke-dashoffset: 0; transition: stroke-dashoffset 0.3s ease-out 0.25s; }
+
+@keyframes spin-arc {
+  from { transform: rotate(-90deg); }
+  to { transform: rotate(270deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .done-glyphs .icon { transition: opacity 0.2s; transform: none; }
-  #done[data-phase='saving'] .g-wait { animation: none; }
+  .done-morph * { transition-duration: 0s !important; transition-delay: 0s !important; }
+  .done-morph .m-ring { animation: none; }
 }
 
 #bookmark[aria-pressed='true'] {
