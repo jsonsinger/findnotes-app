@@ -939,6 +939,7 @@ function setSheet(h) {
   el.drawer.style.setProperty('--full', clamp((h - PEEK) / (full - PEEK || 1), 0, 1).toFixed(3));
   el.scrim.style.opacity = Math.min(1, h / PEEK).toFixed(3);
 
+  el.drawer.classList.toggle('small', h < full - 2); // until it fills the screen, the note doesn't scroll
   const isExpanded = h > (PEEK + full) / 2;
   if (isExpanded !== expanded) {
     expanded = isExpanded;
@@ -1076,13 +1077,16 @@ vv?.addEventListener('resize', fitViewport);
 vv?.addEventListener('scroll', fitViewport);
 addEventListener('resize', () => { measureFull(); fitViewport(); });
 
-// Dragging starts on the handle or the top row, never on the text fields,
-// so selecting text and scrolling a long note still work.
+// Dragging starts on the handle or the top row. While the sheet is smaller than the screen,
+// pushing the note itself up also grows the sheet (a tap still edits); once it fills the
+// screen the text scrolls and selects as usual.
 el.drawer.addEventListener('pointerdown', (e) => {
   if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
+  if (e.target.closest('button')) return;
+  const content = !e.target.closest('.grab, .drawer-top');
+  if (content && (e.pointerType === 'mouse' || !el.drawer.classList.contains('small'))) return;
   measureFull();
-  drag = { id: e.pointerId, y: e.clientY, h: sheetH, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
+  drag = { id: e.pointerId, y: e.clientY, h: sheetH, content, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
 });
 
 el.drawer.addEventListener('pointermove', (e) => {
@@ -1095,7 +1099,8 @@ el.drawer.addEventListener('pointermove', (e) => {
     drag.h = sheetH;
     el.drawer.setPointerCapture(e.pointerId);
   }
-  setSheet(clamp(drag.h + (drag.y - e.clientY), 0, fullHeight()));
+  // From the note, the sheet only grows: pulling the text down must not throw the note away
+  setSheet(clamp(drag.h + (drag.y - e.clientY), drag.content ? drag.h : 0, fullHeight()));
 
   // Keep roughly the last 100ms of movement to measure how fast the finger was going.
   drag.samples.push({ y: e.clientY, t: e.timeStamp });
@@ -1129,13 +1134,16 @@ function endDrag(e) {
     target = Math.abs(sheetH - PEEK) <= Math.abs(sheetH - full) ? PEEK : full;
   }
 
+  if (d.content) target = sheetH > d.h + 10 ? full : d.h; // pushing the note up opens it all the way
   if (target === 0) dismissDrawer();
   else animateSheet(target);
 }
 // While the sheet is open, a finger moving over anything but the description must not
-// scroll the page (on an iPhone that pulls down to refresh the app).
+// scroll the page (on an iPhone that pulls down to refresh the app). The description scrolls
+// only once the sheet fills the screen; before that the finger moves the sheet.
 document.addEventListener('touchmove', (e) => {
-  if (drawer && el.drawer.classList.contains('open') && !e.target.closest('#item-body')) e.preventDefault();
+  if (!drawer || !el.drawer.classList.contains('open')) return;
+  if (!e.target.closest('#item-body') || el.drawer.classList.contains('small')) e.preventDefault();
 }, { passive: false });
 
 el.drawer.addEventListener('pointerup', endDrag);

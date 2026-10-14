@@ -773,6 +773,9 @@ h1, h2 {
   overflow-wrap: anywhere;
 }
 
+/* A sheet smaller than the screen moves with the finger instead of scrolling the note (see app.js) */
+.drawer.small #item-body { touch-action: none; }
+
 /* With the formatting bar showing there has to be room under the last line */
 .drawer.show-meta #item-body {
   padding-bottom: 16px;
