@@ -1086,6 +1086,13 @@ function watchViewport() {
 
 // When focus leaves the fields the keyboard really is going away, so re-check.
 el.drawer.addEventListener('focusout', () => setTimeout(() => fitViewport(true), 200));
+
+// The status bar dims with the drawer only while typing (see .scrim.tint in styles.css). The
+// tint goes as the field loses focus, before the keyboard closes and iOS picks the colour again.
+el.drawer.addEventListener('focusin', (e) => {
+  el.scrim.classList.toggle('tint', e.target.matches('input, textarea, [contenteditable]'));
+});
+el.drawer.addEventListener('focusout', () => el.scrim.classList.remove('tint'));
 vv?.addEventListener('resize', fitViewport);
 vv?.addEventListener('scroll', fitViewport);
 addEventListener('resize', () => { measureFull(); fitViewport(); });
