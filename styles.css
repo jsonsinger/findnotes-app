@@ -648,10 +648,11 @@ h1, h2 {
    there left the status bar dark after the drawer closed. */
 .scrim {
   position: absolute;
-  inset: env(safe-area-inset-top, 0px) 0 0;
+  inset: 0; /* up under the status bar too, so the time and battery dim with the app */
   touch-action: none; /* dragging the dimmed background must not pull the page to refresh */
   /* iOS 26 tints the status bar from the background-color of fixed layers near the top, and
-     keeps that tint after they hide. Painting the dim as an image leaves nothing for it to pick up. */
+     keeps that tint after they hide. Painting the dim as an image leaves nothing for it to pick
+     up, so the status bar dims with the scrim's own pixels and clears when it fades. */
   background-color: transparent;
   background-image: linear-gradient(var(--scrim), var(--scrim));
   opacity: 0;
