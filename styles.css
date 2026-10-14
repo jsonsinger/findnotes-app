@@ -650,7 +650,10 @@ h1, h2 {
   position: absolute;
   inset: env(safe-area-inset-top, 0px) 0 0;
   touch-action: none; /* dragging the dimmed background must not pull the page to refresh */
-  background: var(--scrim);
+  /* iOS 26 tints the status bar from the background-color of fixed layers near the top, and
+     keeps that tint after they hide. Painting the dim as an image leaves nothing for it to pick up. */
+  background-color: transparent;
+  background-image: linear-gradient(var(--scrim), var(--scrim));
   opacity: 0;
   visibility: hidden;
   z-index: 4;
