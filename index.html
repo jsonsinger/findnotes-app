@@ -97,6 +97,9 @@
     <symbol id="i-trash" viewBox="0 0 24 24">
         <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>
     </symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24">
+        <path d="M8.5 19.5 4 15a1.5 1.5 0 0 1 0-2.1l8.9-8.9a1.5 1.5 0 0 1 2.1 0l5 5a1.5 1.5 0 0 1 0 2.1l-8 8.4M9.5 9.5l6 6M8.5 19.5H20"/>
+    </symbol>
     <symbol id="i-list" viewBox="0 0 24 24">
       <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>
     </symbol>
@@ -214,13 +217,13 @@
             <span id="hint"><span id="hint-done" hidden>Completed</span><svg class="icon hint-icon" id="hint-icon" aria-hidden="true" hidden><use href="#i-clock"/></svg><span id="hint-text"></span></span>
             <span class="drawer-actions">
                 <button class="icon-btn" id="trash" aria-label="Clear draft" hidden>
-                    <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+                    <svg class="icon" aria-hidden="true"><use href="#i-eraser"/></svg>
                 </button>
                 <button class="icon-btn" id="bookmark" aria-label="Bookmark" aria-pressed="false" hidden>
                     <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
                 </button>
                 <button class="icon-btn" id="done" aria-label="Add" data-state="plus">
-                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
+                    <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-p m-p1" d="M14 8.5v11"/><path class="m-p m-p2" d="M8.5 14h11"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
                 </button>
             </span>
         </div>

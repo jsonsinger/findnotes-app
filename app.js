@@ -482,17 +482,20 @@ function setHint(message, isError = false) {
 
 // An error wins; otherwise it says when the note was last saved.
 function refreshHint() {
-  // Editing a note: "Unsaved changes" until autosave starts, "Saving..." while it runs,
-  // then the last saved time again
-  const editing = !hintError && drawer?.mode === 'edit';
-  const unsaved = editing && drawer.pending;
-  const saving = editing && !unsaved && !!drawer.saving;
-  const saved = hintError ? '' : unsaved ? 'Unsaved changes' : saving ? 'Saving\u2026' : savedText();
+  // "Unsaved changes" until autosave starts, "Saving..." while it runs, then the last saved
+  // time again. A new note says the same about its draft.
+  const adding = drawer?.mode === 'add';
+  const open = !hintError && !!drawer;
+  const unsaved = open && !!drawer.pending;
+  const saving = open && !unsaved && !!drawer.saving;
+  const saved = hintError ? '' : unsaved ? (adding ? 'Unsaved draft' : 'Unsaved changes')
+    : saving ? (adding ? 'Saving draft\u2026' : 'Saving\u2026') : savedText();
   el.hintText.textContent = hintError || saved;
   el.foot.classList.toggle('unsaved', unsaved);
   el.foot.classList.toggle('saving', saving);
-  // The close button tells the same story: ×, a spinning arrow while saving, a tick for a moment after
-  if (drawer?.mode === 'edit') el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : 'close';
+  // The button tells the same story: × (or + for a new note), a spinning arc while saving,
+  // a ring and tick for a moment after
+  if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : adding ? 'add' : 'close';
   else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
@@ -529,8 +532,8 @@ function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
 }
 
-// Gold plus: adding. Editing: an × in a soft circle (closing saves anything pending), which
-// turns into a spinning arrow while autosave runs and a tick once it has, then back to × (see refreshHint).
+// Adding: a gold + in a soft circle. Editing: an × (closing saves anything pending). Either one
+// draws a spinning arc while autosave runs and a ring and tick once it has (see refreshHint).
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
@@ -539,7 +542,7 @@ function updateCommit() {
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
 }
 
-// Only a new note with something in it has a bin (clear the draft). Archiving happens
+// Only a new note with something in it has an eraser (clear the draft). Archiving happens
 // from the list, not inside a note.
 function updateTrash() {
   if (!drawer) return;
@@ -758,7 +761,9 @@ function saveEdit() {
     const empty = !title.trim() && !body.trim();
     writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
-    refreshHint();
+    drawer.pending = false;
+    if (empty) refreshHint();
+    else showSaving(Promise.resolve());
     return;
   }
   if (drawer?.mode !== 'edit') return;
@@ -768,13 +773,18 @@ function saveEdit() {
   drawer.original = { title: drawer.item.title, marks: drawer.item.marks, body: drawer.item.body, updatedAt: drawer.item.updatedAt };
   drawer.canon = drawer.item.body;
   drawer.savedAt = Date.now();
-  drawer.saving = true;
   updateCommit();
+  showSaving(save(db.put('items', drawer.item)));
+}
+
+// "Saving..." stays up a moment even though the write is near instant, so it can be seen,
+// then the button shows its tick for a moment
+function showSaving(write) {
+  drawer.saving = true;
   refreshHint();
-  // "Saving..." stays up a moment even though the write is near instant, so it can be seen
   const sheet = drawer;
   const shown = new Promise((resolve) => setTimeout(resolve, SAVING_MIN_MS));
-  Promise.all([save(db.put('items', drawer.item)), shown]).then(() => {
+  Promise.all([write, shown]).then(() => {
     if (drawer !== sheet) return; // closed, or another note opened
     sheet.saving = false;
     sheet.justSaved = true;
@@ -1169,7 +1179,7 @@ function dismissDrawer() {
 
 /* ---------- archiving an item ---------- */
 
-// The bin only shows while adding: it clears the draft so you can start again.
+// The eraser only shows while adding: it clears the draft so you can start again.
 el.trash.addEventListener('click', () => {
   if (drawer?.mode !== 'add') return;
   cancelSave();
@@ -1181,6 +1191,7 @@ el.trash.addEventListener('click', () => {
   editor.setMarkdown('');
   drawer.bookmarked = false;
   drawer.savedAt = 0;
+  drawer.pending = drawer.saving = drawer.justSaved = false;
   setBookmark(false);
   updateTrash();
   refreshHint();

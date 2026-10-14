@@ -1059,6 +1059,14 @@ h1, h2 {
   transition: stroke-dashoffset 0.2s ease-in;
 }
 
+.done-morph .m-p {
+  stroke: var(--bullet);
+  stroke-width: 2.4;
+  stroke-dasharray: 11;
+  stroke-dashoffset: 11;
+  transition: stroke-dashoffset 0.2s ease-in;
+}
+
 .done-morph .m-tick {
   stroke: var(--bullet); /* the bright gold of bullets; deep gold looked muddy in light */
   stroke-width: 2.4;
@@ -1068,10 +1076,12 @@ h1, h2 {
 }
 
 /* × draws back in once the tick has gone, second stroke a beat after the first */
-#done[data-phase='close'] .m-x { stroke-dashoffset: 0; transition: stroke-dashoffset 0.22s ease-out 0.15s; }
-#done[data-phase='close'] .m-x2 { transition-delay: 0.25s; }
+#done[data-phase='close'] .m-x,
+#done[data-phase='add'] .m-p { stroke-dashoffset: 0; transition: stroke-dashoffset 0.22s ease-out 0.15s; }
+#done[data-phase='close'] .m-x2,
+#done[data-phase='add'] .m-p2 { transition-delay: 0.25s; }
 /* the ring fades rather than unwinding, then quietly resets for the next save */
-#done[data-phase='close'] .m-ring { transition: opacity 0.25s, stroke 0.25s, stroke-dashoffset 0s 0.3s; }
+#done:is([data-phase='close'], [data-phase='add']) .m-ring { transition: opacity 0.25s, stroke 0.25s, stroke-dashoffset 0s 0.3s; }
 
 #done[data-phase='saving'] .m-ring { stroke-dashoffset: 46; opacity: 1; animation-play-state: running; }
 
