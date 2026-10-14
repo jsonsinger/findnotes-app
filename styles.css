@@ -643,9 +643,12 @@ h1, h2 {
 /* Drawer: the sheet you drag up or down to add or edit an item.
    Its height and position are set from JavaScript while you drag (setSheet),
    so there are no CSS transitions on it. .open only decides if it is visible. */
+/* The dimming starts below the time and battery. iOS 26 colours the status bar from whatever
+   sits at the top edge of the screen and doesn't look again when it goes away, so a scrim up
+   there left the status bar dark after the drawer closed. */
 .scrim {
   position: absolute;
-  inset: 0;
+  inset: env(safe-area-inset-top, 0px) 0 0;
   touch-action: none; /* dragging the dimmed background must not pull the page to refresh */
   background: var(--scrim);
   opacity: 0;
@@ -675,7 +678,7 @@ h1, h2 {
   padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 10px);
   padding-top: calc(env(safe-area-inset-top, 0px) * var(--full));
   background: var(--bg);
-  border-top: 0.5px solid var(--line-strong);
+  border-top: calc(0.5px * (1 - var(--full))) solid var(--line-strong); /* no line once it fills the screen */
   border-radius: calc(18px * (1 - var(--full))) calc(18px * (1 - var(--full))) 0 0;
   visibility: hidden;
   touch-action: none; /* only the description scrolls, see #item-body */
@@ -1121,6 +1124,10 @@ h1, h2 {
 .drawer.show-meta .meta {
   display: flex;
 }
+
+/* The list's icon before its name, a size down from the text around it */
+.meta-list { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.meta-icon { width: 14px; height: 14px; flex: none; }
 
 /* "Completed" leads the hint when the note is ticked off, with a dot before the saved time */
 #hint-done { color: var(--text-muted); }
@@ -1903,7 +1910,8 @@ h1, h2 {
 .no-icons .who .tile,
 .no-icons .all-row .tile,
 .no-icons .arch-row .tile,
-.no-icons .menu button .icon {
+.no-icons .menu button .icon,
+.no-icons .meta-icon {
   display: none;
 }
 
