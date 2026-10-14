@@ -41,14 +41,14 @@
   <link rel="modulepreload" href="editor.js">
 </head>
 <body>
-  <!-- The opening screen: drawn in the very first frame, in the theme's colours, then
-       app.js fades it out once the lists are ready (at least about a second after launch).
-       It matches the iPhone launch images in splash/, so the hand-over is seamless. -->
+  <!-- The opening screen: the flame draws itself, then the name appears, in the theme's colours.
+       app.js fades it out once the lists are ready (at least a little over a second after launch).
+       Its first frame is the empty screen, the same as the iPhone launch images in splash/. -->
   <div class="boot" id="boot" aria-hidden="true">
     <svg class="boot-flame" viewBox="0 0 24 24">
-      <path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
+      <path pathLength="1" d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/>
     </svg>
-    <div class="boot-bar"><span></span></div>
+    <div class="boot-name">FindNotes</div>
   </div>
 
   <!-- Icon sprite: define each icon once, reuse it with <use> -->
