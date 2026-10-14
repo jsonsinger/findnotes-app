@@ -1060,7 +1060,7 @@ h1, h2 {
 }
 
 .done-morph .m-tick {
-  stroke: var(--accent-text);
+  stroke: var(--bullet); /* the bright gold of bullets; deep gold looked muddy in light */
   stroke-width: 2.4;
   stroke-dasharray: 13.2;
   stroke-dashoffset: 13.2;
@@ -1075,7 +1075,7 @@ h1, h2 {
 
 #done[data-phase='saving'] .m-ring { stroke-dashoffset: 46; opacity: 1; animation-play-state: running; }
 
-#done[data-phase='saved'] .m-ring { stroke-dashoffset: 0; opacity: 1; stroke: var(--accent-text); }
+#done[data-phase='saved'] .m-ring { stroke-dashoffset: 0; opacity: 1; stroke: var(--bullet); }
 #done[data-phase='saved'] .m-tick { stroke-dashoffset: 0; transition: stroke-dashoffset 0.3s ease-out 0.25s; }
 
 @keyframes spin-arc {
