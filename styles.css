@@ -998,7 +998,7 @@ h1, h2 {
   color: var(--danger);
 }
 
-/* The confirm glyph: a gold plus when adding, otherwise a tick in a gold circle. */
+/* The confirm button: a gold plus when adding, a "Done" pill when editing. */
 #done {
   color: var(--text);
 }
@@ -1011,29 +1011,36 @@ h1, h2 {
   stroke-width: 2.2;
 }
 
-/* Editing: the same gold circle and dark tick as a done row, always (the hint says Completed) */
-#done[data-circle] { position: relative; transition: opacity 0.2s; }
+.done-label { display: none; }
 
-/* While saving, the tick dims, then comes back */
-.drawer-top.saving #done { opacity: 0.4; }
-
-#done[data-circle]::before {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  border: 1.8px solid var(--accent);
-  background: var(--accent);
+/* Editing: "Done" saves and closes. Grey when everything is saved, gold while changes wait
+   (the hint says "Unsaved changes"), dimmed while saving. */
+#done[data-pill] {
+  width: auto;
+  padding: 0 2px 0 8px;
+  transition: opacity 0.2s;
 }
 
-#done[data-circle] .icon {
-  position: relative;
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.6;
+#done[data-pill] .icon { display: none; }
+
+#done[data-pill] .done-label {
+  display: block;
+  padding: 8px 15px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  background: var(--surface);
+  color: var(--text);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.drawer-top:is(.unsaved, .saving) #done[data-pill] .done-label {
+  background: var(--accent);
   color: var(--on-accent);
 }
 
+.drawer-top.saving #done { opacity: 0.4; }
 
 #bookmark[aria-pressed='true'] {
   color: var(--text-muted);
@@ -2049,8 +2056,8 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
-[data-style='sketch'] #done[data-circle]::before { display: none; } /* Sketch's tick is already drawn in a circle */
-[data-style='sketch'] #done[data-circle] { background: var(--accent); }
+[data-style='sketch'] #done[data-pill] { border: 0; }
+[data-style='sketch'] #done[data-pill] .done-label { border: var(--ink-line); border-radius: var(--wobble); }
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
 /* Popovers sit on a hard shadow, like paper cut-outs */

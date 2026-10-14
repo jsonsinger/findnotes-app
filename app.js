@@ -524,14 +524,14 @@ function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
 }
 
-// Gold plus: adding. Otherwise a dark tick in a gold circle. The state still marks unsaved
-// changes, for the label.
+// Gold plus: adding. Editing: a "Done" button (save and close), grey when everything is saved
+// and gold while changes wait for autosave.
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
-  el.done.toggleAttribute('data-circle', !adding && !!drawer); // a gold circle whether or not it is done; "Completed" says which
-  el.doneIcon.setAttribute('href', adding ? '#i-plus' : '#i-check');
-  const label = adding ? 'Add' : drawer?.pending ? 'Save and close' : 'Close';
+  el.done.toggleAttribute('data-pill', !adding && !!drawer); // editing: a "Done" button, gold while there is something to save
+  el.doneIcon.setAttribute('href', '#i-plus');
+  const label = adding ? 'Add' : 'Done';
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
 }
 
