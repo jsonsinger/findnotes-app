@@ -1011,8 +1011,8 @@ h1, h2 {
   stroke-width: 2.2;
 }
 
-/* Editing: an × in a soft circle. While autosave runs it becomes a turning hourglass, then
-   a tick for a moment, then the × again. The glyphs sit on top of each other and cross-fade. */
+/* Editing: an × in a soft circle. While autosave runs it becomes a spinning circular arrow,
+   then a tick for a moment, then the × again. The glyphs sit on top of each other and cross-fade. */
 .done-glyphs { display: none; }
 
 #done[data-phase] { position: relative; isolation: isolate; }
@@ -1049,11 +1049,10 @@ h1, h2 {
   transform: none;
 }
 
-#done[data-phase='saving'] .g-wait { animation: hourglass 0.7s ease-in-out infinite; }
+#done[data-phase='saving'] .g-wait { animation: spin 0.8s linear infinite; }
 
-@keyframes hourglass {
-  0%, 20% { transform: rotate(0deg); }
-  80%, 100% { transform: rotate(180deg); }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

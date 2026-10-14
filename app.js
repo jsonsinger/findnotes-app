@@ -491,7 +491,7 @@ function refreshHint() {
   el.hintText.textContent = hintError || saved;
   el.foot.classList.toggle('unsaved', unsaved);
   el.foot.classList.toggle('saving', saving);
-  // The close button tells the same story: × , hourglass while saving, a tick for a moment after
+  // The close button tells the same story: ×, a spinning arrow while saving, a tick for a moment after
   if (drawer?.mode === 'edit') el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : 'close';
   else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
@@ -530,7 +530,7 @@ function syncMeta() {
 }
 
 // Gold plus: adding. Editing: an × in a soft circle (closing saves anything pending), which
-// turns into an hourglass while autosave runs and a tick once it has, then back to × (see refreshHint).
+// turns into a spinning arrow while autosave runs and a tick once it has, then back to × (see refreshHint).
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
