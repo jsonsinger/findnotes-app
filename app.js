@@ -30,6 +30,7 @@ const el = {
   titleField: $('title-field'),
   titleMark: $('title-mark'),
   itemBody: $('item-body'),
+  noteScroll: $('note-scroll'),
   foot: $('drawer-top'),
   hintIcon: $('hint-icon'),
   hintText: $('hint-text'),
@@ -467,7 +468,9 @@ let saveTimer = null;
 let maxTimer = null;
 const AUTOSAVE_IDLE_MS = 5000;  // editing saves itself 5 seconds after you pause...
 const AUTOSAVE_MAX_MS = 60000;
-const SAVING_MIN_MS = 700; // how long "Saving..." shows at least  // ...or a minute after the first unsaved change, however long you type
+const SAVING_MIN_MS = 700; // how long "Saving..." shows at least
+const SAVED_TICK_MS = 1200; // how long the close button shows a tick after a save
+let savedTickTimer = 0;  // ...or a minute after the first unsaved change, however long you type
 const cancelSave = () => { clearTimeout(saveTimer); clearTimeout(maxTimer); saveTimer = maxTimer = null; };
 
 let hintError = '';
@@ -481,15 +484,21 @@ function setHint(message, isError = false) {
 
 // An error wins; otherwise it says when the note was last saved.
 function refreshHint() {
-  // Editing a note: "Unsaved changes" until autosave starts, "Saving..." while it runs,
-  // then the last saved time again
-  const editing = !hintError && drawer?.mode === 'edit';
-  const unsaved = editing && drawer.pending;
-  const saving = editing && !unsaved && !!drawer.saving;
-  const saved = hintError ? '' : unsaved ? 'Unsaved changes' : saving ? 'Saving\u2026' : savedText();
+  // "Unsaved changes" until autosave starts, "Saving..." while it runs, then the last saved
+  // time again. A new note says the same about its draft.
+  const adding = drawer?.mode === 'add';
+  const open = !hintError && !!drawer;
+  const unsaved = open && !!drawer.pending;
+  const saving = open && !unsaved && !!drawer.saving;
+  const saved = hintError ? '' : unsaved ? (adding ? 'Unsaved draft' : 'Unsaved changes')
+    : saving ? (adding ? 'Saving draft\u2026' : 'Saving\u2026') : savedText();
   el.hintText.textContent = hintError || saved;
   el.foot.classList.toggle('unsaved', unsaved);
   el.foot.classList.toggle('saving', saving);
+  // The button tells the same story: × (or + for a new note), a spinning arc while saving,
+  // a ring and tick for a moment after
+  if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : adding ? 'add' : 'close';
+  else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
   el.hintDone.hidden = !!hintError || !(drawer?.mode === 'edit' && drawer.item.done);
@@ -523,20 +532,23 @@ const getBody = () => editor.getMarkdown();
 
 function syncMeta() {
   el.drawer.classList.toggle('show-meta', !!drawer && expanded);
+  if (!expanded) el.noteScroll.scrollTop = 0; // a smaller sheet starts at the title again
 }
 
-// Gold plus: adding. Otherwise a dark tick in a gold circle. The state still marks unsaved
-// changes, for the label.
+// What scrolls the note: the whole page (title and all) when full-page, the description otherwise
+const noteScroller = () => (expanded ? el.noteScroll : el.itemBody);
+
+// Adding: a gold + in a soft circle. Editing: an × (closing saves anything pending). Either one
+// draws a spinning arc while autosave runs and a ring and tick once it has (see refreshHint).
 function updateCommit() {
   const adding = drawer?.mode === 'add';
   el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
-  el.done.toggleAttribute('data-circle', !adding && !!drawer); // a gold circle whether or not it is done; "Completed" says which
-  el.doneIcon.setAttribute('href', adding ? '#i-plus' : '#i-check');
-  const label = adding ? 'Add' : drawer?.pending ? 'Save and close' : 'Close';
+  el.doneIcon.setAttribute('href', '#i-plus');
+  const label = adding ? 'Add' : 'Close';
   if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
 }
 
-// Only a new note with something in it has a bin (clear the draft). Archiving happens
+// Only a new note with something in it has an eraser (clear the draft). Archiving happens
 // from the list, not inside a note.
 function updateTrash() {
   if (!drawer) return;
@@ -756,7 +768,9 @@ function saveEdit() {
     const empty = !title.trim() && !body.trim();
     writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
-    refreshHint();
+    drawer.pending = false;
+    if (empty) refreshHint();
+    else showSaving(Promise.resolve());
     return;
   }
   if (drawer?.mode !== 'edit') return;
@@ -766,16 +780,28 @@ function saveEdit() {
   drawer.original = { title: drawer.item.title, marks: drawer.item.marks, body: drawer.item.body, updatedAt: drawer.item.updatedAt };
   drawer.canon = drawer.item.body;
   drawer.savedAt = Date.now();
-  drawer.saving = true;
   updateCommit();
+  showSaving(save(db.put('items', drawer.item)));
+}
+
+// "Saving..." stays up a moment even though the write is near instant, so it can be seen,
+// then the button shows its tick for a moment
+function showSaving(write) {
+  drawer.saving = true;
   refreshHint();
-  // "Saving..." stays up a moment even though the write is near instant, so it can be seen
   const sheet = drawer;
   const shown = new Promise((resolve) => setTimeout(resolve, SAVING_MIN_MS));
-  Promise.all([save(db.put('items', drawer.item)), shown]).then(() => {
+  Promise.all([write, shown]).then(() => {
     if (drawer !== sheet) return; // closed, or another note opened
     sheet.saving = false;
+    sheet.justSaved = true;
     refreshHint();
+    clearTimeout(savedTickTimer);
+    savedTickTimer = setTimeout(() => {
+      if (drawer !== sheet) return;
+      sheet.justSaved = false;
+      refreshHint();
+    }, SAVED_TICK_MS);
   });
 }
 
@@ -918,6 +944,7 @@ function setSheet(h) {
   el.drawer.style.setProperty('--full', clamp((h - PEEK) / (full - PEEK || 1), 0, 1).toFixed(3));
   el.scrim.style.opacity = Math.min(1, h / PEEK).toFixed(3);
 
+  el.drawer.classList.toggle('small', h < full - 2); // until it fills the screen, the note doesn't scroll
   const isExpanded = h > (PEEK + full) / 2;
   if (isExpanded !== expanded) {
     expanded = isExpanded;
@@ -1032,9 +1059,10 @@ function revealCaret() {
       const node = sel.focusNode.nodeType === 1 ? sel.focusNode : sel.focusNode.parentElement;
       rect = (node.closest('.b') || node).getBoundingClientRect();
     }
-    const box = el.itemBody.getBoundingClientRect();
-    if (rect.bottom > box.bottom - CARET_MARGIN) el.itemBody.scrollTop += rect.bottom - box.bottom + CARET_MARGIN;
-    else if (rect.top < box.top) el.itemBody.scrollTop -= box.top - rect.top;
+    const scroller = noteScroller();
+    const box = scroller.getBoundingClientRect();
+    if (rect.bottom > box.bottom - CARET_MARGIN) scroller.scrollTop += rect.bottom - box.bottom + CARET_MARGIN;
+    else if (rect.top < box.top) scroller.scrollTop -= box.top - rect.top;
   });
 }
 
@@ -1055,8 +1083,8 @@ vv?.addEventListener('resize', fitViewport);
 vv?.addEventListener('scroll', fitViewport);
 addEventListener('resize', () => { measureFull(); fitViewport(); });
 
-// Dragging starts on the handle or the top row, never on the text fields,
-// so selecting text and scrolling a long note still work.
+// Dragging on the handle or the top row moves the sheet. The note itself moves it too (see
+// the touch handlers below), so the whole sheet answers a swipe like one piece.
 el.drawer.addEventListener('pointerdown', (e) => {
   if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
   if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
@@ -1074,20 +1102,27 @@ el.drawer.addEventListener('pointermove', (e) => {
     drag.h = sheetH;
     el.drawer.setPointerCapture(e.pointerId);
   }
-  setSheet(clamp(drag.h + (drag.y - e.clientY), 0, fullHeight()));
-
-  // Keep roughly the last 100ms of movement to measure how fast the finger was going.
-  drag.samples.push({ y: e.clientY, t: e.timeStamp });
-  while (drag.samples.length > 2 && e.timeStamp - drag.samples[0].t > 100) drag.samples.shift();
+  followFinger(drag, e.clientY, e.timeStamp);
 });
+
+function followFinger(d, y, t) {
+  setSheet(clamp(d.h + (d.y - y), 0, fullHeight()));
+  // Keep roughly the last 100ms of movement to measure how fast the finger was going.
+  d.samples.push({ y, t });
+  while (d.samples.length > 2 && t - d.samples[0].t > 100) d.samples.shift();
+}
 
 function endDrag(e) {
   if (!drag || e.pointerId !== drag.id) return;
   const d = drag;
   drag = null;
   if (!d.moved) return; // a tap, the click handler deals with it
-  lastDragEnd = performance.now();
+  settleSheet(d, e.type === 'pointercancel');
+}
 
+// Where a let-go sheet ends up: closed, small or full
+function settleSheet(d, cancelled) {
+  lastDragEnd = performance.now();
   const first = d.samples[0];
   const last = d.samples[d.samples.length - 1];
   const velocity = last.t > first.t ? (first.y - last.y) / (last.t - first.t) : 0; // px/ms, up is positive
@@ -1095,7 +1130,7 @@ function endDrag(e) {
   const stops = [0, PEEK, full];
 
   let target;
-  if (e.type === 'pointercancel') {
+  if (cancelled) {
     target = sheetH < PEEK ? 0 : PEEK;
   } else if (Math.abs(velocity) > 0.5) {
     // A flick moves one stop in its direction, however short the drag was.
@@ -1108,13 +1143,59 @@ function endDrag(e) {
     target = Math.abs(sheetH - PEEK) <= Math.abs(sheetH - full) ? PEEK : full;
   }
 
+  if (d.fromNote && sheetH > d.h + 10) target = full; // pushing the note up opens it all the way
   if (target === 0) dismissDrawer();
   else animateSheet(target);
 }
+
+// A swipe on the title or the note. While the sheet is smaller than the screen it always
+// moves the sheet (a tap still edits). Once it fills the screen the note scrolls as usual,
+// and pulling down from the top of it brings the sheet down. Touch events, not pointer
+// events, because only cancelling a touchmove stops iOS from scrolling the note instead.
+let noteSwipe = null;
+el.drawer.addEventListener('touchstart', (e) => {
+  noteSwipe = null;
+  if (!drawer || drag || e.touches.length !== 1) return;
+  if (!e.target.closest('.title-field, .meta, #item-body')) return;
+  const t = e.touches[0];
+  noteSwipe = { y: t.clientY, h: sheetH, inBody: !!e.target.closest('#item-body'), moved: false, samples: [{ y: t.clientY, t: e.timeStamp }] };
+}, { passive: true });
+
+el.drawer.addEventListener('touchmove', (e) => {
+  if (!noteSwipe) return;
+  const y = e.touches[0].clientY;
+  if (!noteSwipe.moved) {
+    const dy = y - noteSwipe.y; // down is positive
+    if (Math.abs(dy) < 6) return; // still might be a tap
+    const full = !el.drawer.classList.contains('small');
+    const sel = getSelection();
+    const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
+    const atTop = expanded ? el.noteScroll.scrollTop <= 0 : !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
+    if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
+    measureFull();
+    noteSwipe.moved = true;
+    noteSwipe.fromNote = true;
+    sheetAnim++; // stop any animation under the finger
+    noteSwipe.y = y;
+    noteSwipe.h = sheetH;
+  }
+  e.preventDefault();
+  followFinger(noteSwipe, y, e.timeStamp);
+}, { passive: false });
+
+const endSwipe = (e) => {
+  const s = noteSwipe;
+  noteSwipe = null;
+  if (s?.moved) settleSheet(s, e.type === 'touchcancel');
+};
+el.drawer.addEventListener('touchend', endSwipe);
+el.drawer.addEventListener('touchcancel', endSwipe);
 // While the sheet is open, a finger moving over anything but the description must not
-// scroll the page (on an iPhone that pulls down to refresh the app).
+// scroll the page (on an iPhone that pulls down to refresh the app). The description scrolls
+// only once the sheet fills the screen; before that the finger moves the sheet.
 document.addEventListener('touchmove', (e) => {
-  if (drawer && el.drawer.classList.contains('open') && !e.target.closest('#item-body')) e.preventDefault();
+  if (!drawer || !el.drawer.classList.contains('open')) return;
+  if (!e.target.closest('#item-body') || el.drawer.classList.contains('small')) e.preventDefault();
 }, { passive: false });
 
 el.drawer.addEventListener('pointerup', endDrag);
@@ -1163,7 +1244,7 @@ function dismissDrawer() {
 
 /* ---------- archiving an item ---------- */
 
-// The bin only shows while adding: it clears the draft so you can start again.
+// The eraser only shows while adding: it clears the draft so you can start again.
 el.trash.addEventListener('click', () => {
   if (drawer?.mode !== 'add') return;
   cancelSave();
@@ -1175,6 +1256,7 @@ el.trash.addEventListener('click', () => {
   editor.setMarkdown('');
   drawer.bookmarked = false;
   drawer.savedAt = 0;
+  drawer.pending = drawer.saving = drawer.justSaved = false;
   setBookmark(false);
   updateTrash();
   refreshHint();
