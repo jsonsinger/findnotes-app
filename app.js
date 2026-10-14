@@ -1077,16 +1077,13 @@ vv?.addEventListener('resize', fitViewport);
 vv?.addEventListener('scroll', fitViewport);
 addEventListener('resize', () => { measureFull(); fitViewport(); });
 
-// Dragging starts on the handle or the top row. While the sheet is smaller than the screen,
-// pushing the note itself up also grows the sheet (a tap still edits); once it fills the
-// screen the text scrolls and selects as usual.
+// Dragging on the handle or the top row moves the sheet. The note itself moves it too (see
+// the touch handlers below), so the whole sheet answers a swipe like one piece.
 el.drawer.addEventListener('pointerdown', (e) => {
   if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (e.target.closest('button')) return;
-  const content = !e.target.closest('.grab, .drawer-top');
-  if (content && (e.pointerType === 'mouse' || !el.drawer.classList.contains('small'))) return;
+  if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
   measureFull();
-  drag = { id: e.pointerId, y: e.clientY, h: sheetH, content, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
+  drag = { id: e.pointerId, y: e.clientY, h: sheetH, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
 });
 
 el.drawer.addEventListener('pointermove', (e) => {
@@ -1099,21 +1096,27 @@ el.drawer.addEventListener('pointermove', (e) => {
     drag.h = sheetH;
     el.drawer.setPointerCapture(e.pointerId);
   }
-  // From the note, the sheet only grows: pulling the text down must not throw the note away
-  setSheet(clamp(drag.h + (drag.y - e.clientY), drag.content ? drag.h : 0, fullHeight()));
-
-  // Keep roughly the last 100ms of movement to measure how fast the finger was going.
-  drag.samples.push({ y: e.clientY, t: e.timeStamp });
-  while (drag.samples.length > 2 && e.timeStamp - drag.samples[0].t > 100) drag.samples.shift();
+  followFinger(drag, e.clientY, e.timeStamp);
 });
+
+function followFinger(d, y, t) {
+  setSheet(clamp(d.h + (d.y - y), 0, fullHeight()));
+  // Keep roughly the last 100ms of movement to measure how fast the finger was going.
+  d.samples.push({ y, t });
+  while (d.samples.length > 2 && t - d.samples[0].t > 100) d.samples.shift();
+}
 
 function endDrag(e) {
   if (!drag || e.pointerId !== drag.id) return;
   const d = drag;
   drag = null;
   if (!d.moved) return; // a tap, the click handler deals with it
-  lastDragEnd = performance.now();
+  settleSheet(d, e.type === 'pointercancel');
+}
 
+// Where a let-go sheet ends up: closed, small or full
+function settleSheet(d, cancelled) {
+  lastDragEnd = performance.now();
   const first = d.samples[0];
   const last = d.samples[d.samples.length - 1];
   const velocity = last.t > first.t ? (first.y - last.y) / (last.t - first.t) : 0; // px/ms, up is positive
@@ -1121,7 +1124,7 @@ function endDrag(e) {
   const stops = [0, PEEK, full];
 
   let target;
-  if (e.type === 'pointercancel') {
+  if (cancelled) {
     target = sheetH < PEEK ? 0 : PEEK;
   } else if (Math.abs(velocity) > 0.5) {
     // A flick moves one stop in its direction, however short the drag was.
@@ -1134,10 +1137,53 @@ function endDrag(e) {
     target = Math.abs(sheetH - PEEK) <= Math.abs(sheetH - full) ? PEEK : full;
   }
 
-  if (d.content) target = sheetH > d.h + 10 ? full : d.h; // pushing the note up opens it all the way
+  if (d.fromNote && sheetH > d.h + 10) target = full; // pushing the note up opens it all the way
   if (target === 0) dismissDrawer();
   else animateSheet(target);
 }
+
+// A swipe on the title or the note. While the sheet is smaller than the screen it always
+// moves the sheet (a tap still edits). Once it fills the screen the note scrolls as usual,
+// and pulling down from the top of it brings the sheet down. Touch events, not pointer
+// events, because only cancelling a touchmove stops iOS from scrolling the note instead.
+let noteSwipe = null;
+el.drawer.addEventListener('touchstart', (e) => {
+  noteSwipe = null;
+  if (!drawer || drag || e.touches.length !== 1) return;
+  if (!e.target.closest('.title-field, .meta, #item-body')) return;
+  const t = e.touches[0];
+  noteSwipe = { y: t.clientY, h: sheetH, inBody: !!e.target.closest('#item-body'), moved: false, samples: [{ y: t.clientY, t: e.timeStamp }] };
+}, { passive: true });
+
+el.drawer.addEventListener('touchmove', (e) => {
+  if (!noteSwipe) return;
+  const y = e.touches[0].clientY;
+  if (!noteSwipe.moved) {
+    const dy = y - noteSwipe.y; // down is positive
+    if (Math.abs(dy) < 6) return; // still might be a tap
+    const full = !el.drawer.classList.contains('small');
+    const sel = getSelection();
+    const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
+    const atTop = !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
+    if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
+    measureFull();
+    noteSwipe.moved = true;
+    noteSwipe.fromNote = true;
+    sheetAnim++; // stop any animation under the finger
+    noteSwipe.y = y;
+    noteSwipe.h = sheetH;
+  }
+  e.preventDefault();
+  followFinger(noteSwipe, y, e.timeStamp);
+}, { passive: false });
+
+const endSwipe = (e) => {
+  const s = noteSwipe;
+  noteSwipe = null;
+  if (s?.moved) settleSheet(s, e.type === 'touchcancel');
+};
+el.drawer.addEventListener('touchend', endSwipe);
+el.drawer.addEventListener('touchcancel', endSwipe);
 // While the sheet is open, a finger moving over anything but the description must not
 // scroll the page (on an iPhone that pulls down to refresh the app). The description scrolls
 // only once the sheet fills the screen; before that the finger moves the sheet.
