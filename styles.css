@@ -2271,8 +2271,8 @@ h1, h2 {
 
 /* ---------- Opening screen ----------
    While the app starts (index.html, #boot), the flame draws itself in one line and the name
-   appears under it. The first frame is the empty screen, the same as the iPhone launch images
-   in splash/. app.js adds .done when the lists are ready, which fades the screen away. */
+   appears under it. It starts on the phone's own white or black (what iOS shows before the page
+   paints) and settles into the theme's background. app.js adds .done when the lists are ready, which fades the screen away. */
 .boot {
   --boot-ink: var(--accent);
   position: fixed;
@@ -2283,10 +2283,16 @@ h1, h2 {
   align-items: center;
   justify-content: center;
   gap: 24px;
-  background: var(--bg);
+  /* iPhones show a plain white or black screen in the phone's own light or dark mode while
+     the app starts, so begin on that and settle into the theme's background */
+  background: #fff;
   transition: opacity 0.35s ease, visibility 0s 0.35s;
   /* If app.js never gets to say it's ready, don't hide the app forever */
-  animation: boot-giveup 0.35s 6s forwards;
+  animation: boot-settle 0.5s ease-out forwards, boot-giveup 0.35s 6s forwards;
+}
+
+@media (prefers-color-scheme: dark) {
+  .boot { background: #000; }
 }
 
 /* Light: the bright gold of the bullets (the light yellow is too faint for a line).
@@ -2325,6 +2331,7 @@ h1, h2 {
 
 @keyframes boot-draw { to { stroke-dashoffset: 0; } }
 @keyframes boot-name { to { opacity: 1; translate: 0 0; } }
+@keyframes boot-settle { to { background-color: var(--bg); } }
 @keyframes boot-giveup { to { opacity: 0; visibility: hidden; } }
 
 @media (prefers-reduced-motion: reduce) {
