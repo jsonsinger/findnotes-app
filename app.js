@@ -38,6 +38,7 @@ const el = {
   bookmark: $('bookmark'),
   metaDate: $('meta-date'),
   metaList: $('meta-list'),
+  metaIcon: $('meta-icon'),
   hintDone: $('hint-done'),
   toast: $('toast'),
   menuBtn: $('menu-btn'),
@@ -688,6 +689,7 @@ function showDrawer(mode, item) {
   updateTrash();
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
+  el.metaIcon.setAttribute('href', iconHref(currentList()));
   setBookmark(drawer.bookmarked);
   syncTitleMark();
   expanded = false;
@@ -995,6 +997,9 @@ function fitViewport(settled) {
     const wasFull = lastFull > PEEK && at >= lastFull - 2;
     const target = wasFull ? full : Math.min(at, full);
     if (moving && target === glide.to) { /* already on its way there */ }
+    // The app has already grown or shrunk with the keyboard, so a full-page sheet just takes
+    // the new size. Gliding there would drop its top edge and slide it back up, as if reopening.
+    else if (wasFull && !moving) setSheet(target);
     else if (moving || keyboard !== view.keyboard) animateSheet(target).then(revealCaret); // glide as the keyboard comes or goes
     else setSheet(target);
   }
