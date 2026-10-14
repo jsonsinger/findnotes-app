@@ -78,6 +78,7 @@ const el = {
   selX: $('sel-x'),
   bannerAction: $('banner-action'),
   fmtbar: $('fmtbar'),
+  addItem: $('add-item'),
   themeSeg: $('theme-seg'),
   iconsSwitch: $('icons-switch'),
   sketchSwitch: $('sketch-switch'),
@@ -497,7 +498,7 @@ function refreshHint() {
   el.foot.classList.toggle('saving', saving);
   // The button tells the same story: × (or + for a new note), a spinning arc while saving,
   // a ring and tick for a moment after
-  if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : adding ? 'add' : 'close';
+  if (drawer) el.done.dataset.phase = saving ? 'saving' : !unsaved && drawer.justSaved ? 'saved' : 'close';
   else delete el.done.dataset.phase;
   el.hintIcon.toggleAttribute('hidden', !saved); // an SVG has no .hidden property
   // A ticked-off note says so first: "Completed · Saved 2 min ago"
@@ -538,14 +539,12 @@ function syncMeta() {
 // What scrolls the note: the whole page (title and all) when full-page, the description otherwise
 const noteScroller = () => (expanded ? el.noteScroll : el.itemBody);
 
-// Adding: a gold + in a soft circle. Editing: an × (closing saves anything pending). Either one
-// draws a spinning arc while autosave runs and a ring and tick once it has (see refreshHint).
+// Top right is always an × in a soft circle: closing saves anything pending (a new item keeps
+// it as the draft). It draws a spinning arc while autosave runs and a ring and tick once it has
+// (see refreshHint). A new item is added with the gold Add button at the bottom.
 function updateCommit() {
-  const adding = drawer?.mode === 'add';
-  el.done.dataset.state = adding ? 'plus' : drawer?.pending ? 'pending' : 'saved';
-  el.doneIcon.setAttribute('href', '#i-plus');
-  const label = adding ? 'Add' : 'Close';
-  if (el.done.getAttribute('aria-label') !== label) el.done.setAttribute('aria-label', label);
+  el.done.dataset.state = drawer?.pending ? 'pending' : 'saved';
+  el.addItem.hidden = drawer?.mode !== 'add';
 }
 
 // Only a new note with something in it has an eraser (clear the draft). Archiving happens
@@ -838,13 +837,21 @@ el.add.addEventListener('click', openAdd);
 el.scrim.addEventListener('click', dismissDrawer);
 
 el.done.addEventListener('click', () => {
-  if (drawer?.mode === 'add' && !el.itemTitle.value.trim()) {
+  if (drawer?.mode === 'add') dismissDrawer(); // keeps what you typed as the draft
+  else closeDrawer();
+});
+
+el.addItem.addEventListener('click', () => {
+  if (drawer?.mode !== 'add') return;
+  if (!el.itemTitle.value.trim()) {
     setHint('Enter a title first', true);
     el.itemTitle.focus();
     return;
   }
   closeDrawer();
 });
+// Like the formatting buttons, Add must not take focus: the keyboard would drop and the sheet jump
+el.addItem.addEventListener('pointerdown', (e) => e.preventDefault());
 
 el.itemTitle.addEventListener('input', () => {
   shiftMarks(drawer.titleWas, el.itemTitle.value);
