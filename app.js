@@ -1087,7 +1087,8 @@ addEventListener('resize', () => { measureFull(); fitViewport(); });
 // the touch handlers below), so the whole sheet answers a swipe like one piece.
 el.drawer.addEventListener('pointerdown', (e) => {
   if (!drawer || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  if (!e.target.closest('.grab, .drawer-top') || e.target.closest('.drawer-top button')) return;
+  // The whole top bar is a handle, buttons included: a tap still presses them, a drag moves the sheet
+  if (!e.target.closest('.grab, .drawer-top')) return;
   measureFull();
   drag = { id: e.pointerId, y: e.clientY, h: sheetH, moved: false, samples: [{ y: e.clientY, t: e.timeStamp }] };
 });
@@ -1166,12 +1167,19 @@ el.drawer.addEventListener('touchmove', (e) => {
   const y = e.touches[0].clientY;
   if (!noteSwipe.moved) {
     const dy = y - noteSwipe.y; // down is positive
+    if (!dy) return;
+    // Decide on the first movement: iOS commits to scrolling the note on that touchmove, and
+    // after that it can't be cancelled, which made pulling a full note down hit and miss.
+    if (!noteSwipe.claimed) {
+      const full = !el.drawer.classList.contains('small');
+      const sel = getSelection();
+      const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
+      const atTop = expanded ? el.noteScroll.scrollTop <= 0 : !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
+      if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
+      noteSwipe.claimed = true;
+    }
+    e.preventDefault();
     if (Math.abs(dy) < 6) return; // still might be a tap
-    const full = !el.drawer.classList.contains('small');
-    const sel = getSelection();
-    const selecting = !sel.isCollapsed && el.drawer.contains(sel.anchorNode); // dragging a selection, leave it alone
-    const atTop = expanded ? el.noteScroll.scrollTop <= 0 : !noteSwipe.inBody || el.itemBody.scrollTop <= 0;
-    if (selecting || (full && !(dy > 0 && atTop))) { noteSwipe = null; return; } // the note scrolls
     measureFull();
     noteSwipe.moved = true;
     noteSwipe.fromNote = true;
@@ -1200,6 +1208,14 @@ document.addEventListener('touchmove', (e) => {
 
 el.drawer.addEventListener('pointerup', endDrag);
 el.drawer.addEventListener('pointercancel', endDrag);
+
+// The end of a drag that started on a top-bar button is not a press of that button
+el.drawer.addEventListener('click', (e) => {
+  if (performance.now() - lastDragEnd < 400 && e.target.closest('.drawer-top button')) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
 
 // Tapping the handle toggles between small and full.
 el.grab.addEventListener('click', () => {
