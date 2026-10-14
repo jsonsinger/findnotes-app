@@ -38,6 +38,7 @@ const el = {
   bookmark: $('bookmark'),
   metaDate: $('meta-date'),
   metaList: $('meta-list'),
+  metaIcon: $('meta-icon'),
   hintDone: $('hint-done'),
   toast: $('toast'),
   menuBtn: $('menu-btn'),
@@ -688,6 +689,7 @@ function showDrawer(mode, item) {
   updateTrash();
   el.metaDate.textContent = dateText(item ? item.createdAt : Date.now());
   el.metaList.textContent = currentList().name;
+  el.metaIcon.setAttribute('href', iconHref(currentList()));
   setBookmark(drawer.bookmarked);
   syncTitleMark();
   expanded = false;

@@ -1062,6 +1062,10 @@ h1, h2 {
   display: flex;
 }
 
+/* The list's icon before its name, a size down from the text around it */
+.meta-list { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.meta-icon { width: 14px; height: 14px; flex: none; }
+
 /* "Completed" leads the hint when the note is ticked off, with a dot before the saved time */
 #hint-done { color: var(--text-muted); }
 #hint-done.then::after { content: '\00b7'; margin: 0 6px; color: var(--text-muted); }
@@ -1843,7 +1847,8 @@ h1, h2 {
 .no-icons .who .tile,
 .no-icons .all-row .tile,
 .no-icons .arch-row .tile,
-.no-icons .menu button .icon {
+.no-icons .menu button .icon,
+.no-icons .meta-icon {
   display: none;
 }
 
