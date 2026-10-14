@@ -2916,7 +2916,7 @@ async function init() {
 // The opening screen (#boot in index.html) stays until the flame is drawn and the name has
 // had a moment on screen, then fades into the app. With reduced motion there is nothing to
 // watch, so it goes as soon as the lists are ready.
-const BOOT_MIN_MS = 1200;
+const BOOT_MIN_MS = 1700;
 function hideBoot() {
   const boot = document.getElementById('boot');
   if (!boot) return;
