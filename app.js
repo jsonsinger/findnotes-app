@@ -1205,12 +1205,12 @@ const endSwipe = (e) => {
 };
 el.drawer.addEventListener('touchend', endSwipe);
 el.drawer.addEventListener('touchcancel', endSwipe);
-// While the sheet is open, a finger moving over anything but the description must not
-// scroll the page (on an iPhone that pulls down to refresh the app). The description scrolls
-// only once the sheet fills the screen; before that the finger moves the sheet.
+// While the sheet is open, a finger moving over anything but the note must not scroll the
+// page (on an iPhone that pulls down to refresh the app). The note (title, list and text, in
+// #note-scroll) scrolls only once the sheet fills the screen; before that the finger moves the sheet.
 document.addEventListener('touchmove', (e) => {
   if (!drawer || !el.drawer.classList.contains('open')) return;
-  if (!e.target.closest('#item-body') || el.drawer.classList.contains('small')) e.preventDefault();
+  if (!e.target.closest('#note-scroll') || el.drawer.classList.contains('small')) e.preventDefault();
 }, { passive: false });
 
 el.drawer.addEventListener('pointerup', endDrag);

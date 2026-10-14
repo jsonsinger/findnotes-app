@@ -2285,16 +2285,28 @@ h1, h2 {
   align-items: center;
   justify-content: center;
   gap: 24px;
-  /* iPhones show a plain white or black screen in the phone's own light or dark mode while
-     the app starts, so begin on that and settle into the theme's background */
-  background: #fff;
+  /* iOS 26 takes the status bar colour from this background-color as the app opens, and keeps
+     it until the keyboard next appears, so it must be the theme's own (see .boot::before) */
+  background-color: var(--bg);
   transition: opacity 0.35s ease, visibility 0s 0.35s;
   /* If app.js never gets to say it's ready, don't hide the app forever */
-  animation: boot-settle 0.5s ease-out forwards, boot-giveup 0.35s 6s forwards;
+  animation: boot-giveup 0.35s 6s forwards;
+}
+
+/* iPhones show a plain white or black screen in the phone's own light or dark mode while the
+   app starts, so begin on that and fade into the theme's background. Painted as an image on a
+   layer of its own, because iOS ignores images when it picks the status bar colour. */
+.boot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1; /* behind the flame and the name */
+  background-image: linear-gradient(#fff, #fff);
+  animation: boot-settle 0.5s ease-out forwards;
 }
 
 @media (prefers-color-scheme: dark) {
-  .boot { background: #000; }
+  .boot::before { background-image: linear-gradient(#000, #000); }
 }
 
 /* Light: the bright gold of the bullets (the light yellow is too faint for a line).
@@ -2333,7 +2345,7 @@ h1, h2 {
 
 @keyframes boot-draw { to { stroke-dashoffset: 0; } }
 @keyframes boot-name { to { opacity: 1; translate: 0 0; } }
-@keyframes boot-settle { to { background-color: var(--bg); } }
+@keyframes boot-settle { to { opacity: 0; } }
 @keyframes boot-giveup { to { opacity: 0; visibility: hidden; } }
 
 @media (prefers-reduced-motion: reduce) {
