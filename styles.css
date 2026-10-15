@@ -648,11 +648,7 @@ h1, h2 {
   position: absolute;
   inset: 0;
   touch-action: none; /* dragging the dimmed background must not pull the page to refresh */
-  /* iOS 26 colours the status bar from this layer's background-color when the keyboard opens
-     or closes, and keeps that colour until it next does. So the dim is painted as an image,
-     which iOS ignores, and is a background-color (.tint) only while the keyboard is up. Hidden,
-     it is the page's own colour. */
-  background-color: var(--bg);
+  background: var(--scrim);
   opacity: 0;
   visibility: hidden;
   z-index: 4;
@@ -660,13 +656,21 @@ h1, h2 {
 
 .scrim.open {
   visibility: visible;
-  background-color: transparent;
-  background-image: linear-gradient(var(--scrim), var(--scrim));
 }
 
-.scrim.open.tint {
-  background-color: var(--scrim);
-  background-image: none;
+/* iOS 26 colours the status bar from the top layer with a background colour under it, and when
+   that layer goes away (the scrim, search, the opening screen) it keeps the old colour instead
+   of looking again. This strip is always there in the app's own colour, so when the scrim goes
+   the status bar has the app to go back to. */
+.status-cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--bg);
+  pointer-events: none;
+  z-index: 3; /* above the list, below the scrim and the drawer */
 }
 
 /* No grey flash behind a field or button when you press it */
