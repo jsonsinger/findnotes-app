@@ -1829,16 +1829,15 @@ h1, h2 {
   margin-top: 22px;
   text-align: center;
   font-size: 11px;
+  font-style: italic;
   line-height: 1.5;
   color: var(--text-muted);
 }
 
-/* The second line: smaller and a little tongue in cheek */
+/* The credit's second line, in the same small italic */
 .made-by small {
   display: block;
-  font-size: 10px;
-  font-style: italic;
-  opacity: 0.8;
+  font-size: inherit;
 }
 
 .setting-note {
