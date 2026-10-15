@@ -1828,15 +1828,15 @@ h1, h2 {
 .made-by {
   margin-top: 22px;
   text-align: center;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.5;
   color: var(--text-muted);
 }
 
 /* The second line: smaller and a little tongue in cheek */
 .made-by small {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   font-style: italic;
   opacity: 0.8;
 }
