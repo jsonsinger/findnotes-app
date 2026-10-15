@@ -2451,6 +2451,18 @@ function applyTheme() {
   document.querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', sketch ? '#f8f8ff' : light ? '#fbfbfa' : '#15181a');
   document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', light ? 'light' : 'dark');
+  refreshStatusBar();
+}
+
+// iOS 26 doesn't repaint the status bar when the colours change, only when a layer at the top
+// comes or goes. So show a strip in the new colour for a moment, then take it away.
+let tintTimer = 0;
+function refreshStatusBar() {
+  const strip = document.getElementById('tint-refresh');
+  if (!strip) return;
+  clearTimeout(tintTimer);
+  strip.hidden = false;
+  tintTimer = setTimeout(() => { strip.hidden = true; }, 150);
 }
 
 applyTheme();
