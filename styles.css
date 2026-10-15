@@ -1828,9 +1828,16 @@ h1, h2 {
 .made-by {
   margin-top: 22px;
   text-align: center;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.5;
   color: var(--text-muted);
+}
+
+/* The credit's second line, in the same small italic */
+.made-by small {
+  display: block;
+  font-size: inherit;
 }
 
 .setting-note {
