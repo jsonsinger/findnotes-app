@@ -148,8 +148,12 @@ button {
 
 /* The three rows: header, scrolling content, add bar */
 /* Fixed to the screen, so the browser can't pan it when the keyboard opens.
-   JavaScript shrinks it to the space above the keyboard (fitViewport). */
+   JavaScript shrinks it to the space above the keyboard (fitViewport).
+   It has the page's colour of its own because iOS 26 colours the status bar from the fixed layer
+   at the top of the screen: the drawer's scrim while it is open, then #app again once it closes.
+   With no colour of its own, #app left the status bar on the scrim's dim. */
 #app {
+    background-color: var(--bg);
     position: fixed;
     top: 0;
     left: 0;
@@ -658,24 +662,6 @@ h1, h2 {
 .scrim.open {
   visibility: visible;
 }
-
-/* iOS 26 picks the status bar colour from what shows under it when the keyboard opens or
-   closes (and as the app opens), then keeps it. Search undims it because its page is still
-   showing as its keyboard goes. This strip, in the app's own colour, sits under the scrim while
-   the drawer is open; closing lifts it above the scrim before the keyboard goes (.lifted),
-   so the status bar is back to the app's colour at that moment. */
-.status-cover {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top, 0px);
-  background-color: var(--bg);
-  pointer-events: none;
-  z-index: 3; /* above the list, below the scrim and the drawer */
-}
-
-.status-cover.lifted { z-index: 6; }
 
 /* No grey flash behind a field or button when you press it */
 .drawer,
