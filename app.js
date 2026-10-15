@@ -47,6 +47,8 @@ const el = {
   menuScrim: $('menu-scrim'),
   menu: $('menu'),
   allLists: $('all-lists'),
+  allSearchBtn: $('all-search-btn'),
+  allMenuBtn: $('all-menu-btn'),
   allRows: $('all-rows'),
   allCount: $('all-count'),
   allNew: $('all-new'),
@@ -208,6 +210,17 @@ function rememberList(id) {
 
 function recallList() {
   try { return localStorage.getItem(LAST_LIST_KEY); } catch { return null; }
+}
+
+// All lists counts as a place too: left open, the app opens on it next time.
+const ALL_OPEN_KEY = 'find-notes:all-lists';
+
+function rememberAll(open) {
+  try { if (open) localStorage.setItem(ALL_OPEN_KEY, '1'); else localStorage.removeItem(ALL_OPEN_KEY); } catch { /* storage blocked */ }
+}
+
+function recallAll() {
+  try { return localStorage.getItem(ALL_OPEN_KEY) === '1'; } catch { return false; }
 }
 
 function switchTo(id) {
@@ -381,7 +394,12 @@ function lockBackground() {
   for (const node of behind()) node.inert = true;
 }
 
+// A full-screen page can open another over itself (All lists has search and the menu), so
+// the background stays locked until the last of them has closed.
+const screens = () => [el.allLists, el.archive, el.search, el.settings];
+
 function unlockBackground() {
+  if (screens().some((node) => !node.hidden)) return;
   for (const node of behind()) node.inert = false;
 }
 
@@ -1326,25 +1344,32 @@ function restoreItem(item, toListId = item.listId) {
 
 /* ---------- the three-dots menu ---------- */
 
-function openMenu() {
+// Opened from All lists, the menu leaves out what is about one list (All lists, Edit, Archive this list).
+function openMenu(fromAll = false) {
   // You can't archive your only list, so say so by greying it out.
   el.menuArchiveThis.disabled = state.lists.length < 2;
+  el.menu.classList.toggle('from-all', fromAll);
   lockBackground();
+  el.allLists.inert = fromAll; // that page stays behind the menu
   el.menu.hidden = false;
   el.menuScrim.hidden = false;
-  el.menuBtn.setAttribute('aria-expanded', 'true');
-  el.menu.querySelector('button').focus();
+  (fromAll ? el.allMenuBtn : el.menuBtn).setAttribute('aria-expanded', 'true');
+  el.menu.querySelector(fromAll ? 'button:not(.about-list)' : 'button').focus();
 }
 
 function closeMenu() {
   el.menu.hidden = true;
   el.menuScrim.hidden = true;
+  el.allLists.inert = false;
   el.menuBtn.setAttribute('aria-expanded', 'false');
+  el.allMenuBtn.setAttribute('aria-expanded', 'false');
   unlockBackground();
   restoreFocus(); // back on the three-dots button, ready for whatever the menu does next
 }
 
-el.menuBtn.addEventListener('click', openMenu);
+el.menuBtn.addEventListener('click', () => openMenu());
+el.allMenuBtn.addEventListener('click', () => openMenu(true));
+el.allSearchBtn.addEventListener('click', () => openSearch());
 el.menu.addEventListener('touchstart', () => {}, { passive: true }); // lets iOS show :active on the item you touch
 el.menuScrim.addEventListener('click', closeMenu);
 
@@ -1382,12 +1407,17 @@ function renderAll() {
   el.allCount.textContent = plural(state.lists.length, 'list');
 }
 
-function openAll() {
+// `quiet` when the app opens on it: nothing is focused, so no focus ring shows on a row.
+function openAll(quiet = false) {
   renderAll();
-  showScreen(el.allLists, el.allRows.querySelector('.current'));
+  showScreen(el.allLists, quiet ? null : el.allRows.querySelector('.current'));
+  rememberAll(true);
 }
 
-const closeAll = () => hideScreen(el.allLists);
+function closeAll() {
+  hideScreen(el.allLists);
+  rememberAll(false);
+}
 
 el.allRows.addEventListener('click', (e) => {
   const row = e.target.closest('.all-row');
@@ -2188,7 +2218,7 @@ function makeSlider(bar, onCommit, onProgress = () => {}) {
   const inset = knob.offsetLeft || 6;
   let slide = null; // { id, x, dragging, dx }
 
-  const max = () => bar.clientWidth - inset * 2 - 44; // the knob shrinks to 44px while dragging
+  const max = () => bar.clientWidth - inset * 2 - knob.offsetWidth; // the knob keeps its word while dragging
 
   function reset(animate) {
     if (animate) bar.classList.add('settling');
@@ -2217,7 +2247,7 @@ function makeSlider(bar, onCommit, onProgress = () => {}) {
     }
     slide.dx = clamp(dx, 0, max());
     knob.style.left = `${inset + slide.dx}px`;
-    fill.style.width = `${inset + slide.dx + 44 + inset}px`;
+    fill.style.width = `${inset + slide.dx + knob.offsetWidth + inset}px`;
     onProgress(slide.dx / max());
   });
 
@@ -2393,6 +2423,7 @@ el.searchBody.addEventListener('click', (e) => {
   const item = state.items.find((i) => i.id === id);
   if (!item) return;
   closeSearch();
+  if (!el.allLists.hidden) closeAll(); // searched from All lists: go to the note's list
   if (item.listId !== state.currentId) switchTo(item.listId);
   openEdit(item);
 });
@@ -2600,7 +2631,7 @@ makeSlider(el.resetbar, async () => {
   try {
     await db.resetDB();
     // The unsaved draft and the last list opened go too. The theme stays.
-    try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(LAST_LIST_KEY); } catch { /* storage blocked */ }
+    try { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(LAST_LIST_KEY); localStorage.removeItem(ALL_OPEN_KEY); } catch { /* storage blocked */ }
   } catch (error) {
     console.error(error);
     showToast("Couldn't reset. Close FindNotes everywhere and try again.");
@@ -2915,6 +2946,7 @@ async function init() {
     ? remembered
     : state.lists[0].id;
   render();
+  if (recallAll()) openAll(true);
   hideBoot();
 }
 

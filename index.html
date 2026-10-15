@@ -256,11 +256,11 @@
     </section>
        <div class="menu-scrim" id="menu-scrim" hidden></div>
    <div class="menu" id="menu" hidden>
-     <button data-action="all"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg>All lists</button>
+     <button class="about-list" data-action="all"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg>All lists</button>
      <button data-action="new"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New list</button>
-     <button data-action="edit"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg>Edit list</button>
+     <button class="about-list" data-action="edit"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg>Edit list</button>
      <hr>
-     <button data-action="archive-this" id="menu-archive-this"><svg class="icon" aria-hidden="true"><use href="#i-archive-in"/></svg>Archive this list</button>
+     <button class="about-list" data-action="archive-this" id="menu-archive-this"><svg class="icon" aria-hidden="true"><use href="#i-archive-in"/></svg>Archive this list</button>
      <button data-action="archive"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg>View archive</button>
      <button data-action="settings"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg>Settings</button>
    </div>
@@ -281,6 +281,12 @@
      <header class="header">
        <span class="tile"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span>
        <h2>All lists</h2>
+       <button class="icon-btn" id="all-search-btn" aria-label="Search">
+         <svg class="icon"><use href="#i-search"/></svg>
+       </button>
+       <button class="icon-btn" id="all-menu-btn" aria-label="Options" aria-haspopup="true" aria-expanded="false">
+         <svg class="icon"><use href="#i-dots"/></svg>
+       </button>
      </header>
      <div class="screen-body">
        <h3 class="list-label" id="all-count"></h3>
