@@ -24,6 +24,7 @@ const el = {
   list: $('list'),
   add: $('add'),
   scrim: $('scrim'),
+  statusCover: $('status-cover'),
   drawer: $('drawer'),
   trash: $('trash'),
   itemTitle: $('item-title'),
@@ -712,6 +713,7 @@ function showDrawer(mode, item) {
   hintTimer = setInterval(refreshHint, 15000);
 
   lockBackground();
+  el.statusCover.classList.remove('lifted');
   el.drawer.classList.remove('closing');
   el.scrim.classList.remove('closing');
   el.drawer.classList.add('open');
@@ -733,6 +735,9 @@ const openEdit = (item) => showDrawer('edit', item);
 function hideDrawer() {
   cancelSave();
   clearInterval(hintTimer);
+  // Undim the status bar before the keyboard goes: iOS 26 keeps whatever is showing up there
+  // as the keyboard closes (see .status-cover in styles.css), so it must be the app's colour.
+  el.statusCover.classList.add('lifted');
   el.itemTitle.blur();
   el.itemBody.blur();
   drag = null;
