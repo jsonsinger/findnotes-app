@@ -1833,6 +1833,14 @@ h1, h2 {
   color: var(--text-muted);
 }
 
+/* The second line: smaller and a little tongue in cheek */
+.made-by small {
+  display: block;
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 .setting-note {
   padding: 0 20px 6px;
   font-size: 14px;
