@@ -299,6 +299,17 @@ h1, h2 {
   height: calc(var(--bar-bottom) + 56px + 14px + 44px + 20px);
 }
 
+/* A blank list: the list's padding leaves room to scroll past the add bar, which is 40px more
+   than the bar covers, so reach down over that to centre in what you can see. The arrow hangs
+   below, with the same room above, so the icon and words sit in the middle. */
+.list > .empty {
+  min-height: calc(100% + 40px);
+}
+
+.list > .empty:has(.empty-arrow) {
+  padding-top: 76px; /* 20px + the arrow and its gap */
+}
+
 /* A throwaway copy of a neighbouring list, only there during a swipe */
 .pane {
   pointer-events: none;
@@ -498,17 +509,7 @@ h1, h2 {
   transition: max-width 0.15s, opacity 0.15s;
 }
 
-/* Being dragged, the knob shrinks to just the icon */
-.selbar.dragging .sel-knob {
-  gap: 0;
-  padding: 0 11px;
-}
-
-.selbar.dragging .sel-label {
-  max-width: 0;
-  opacity: 0;
-}
-
+/* Being dragged, the knob keeps its word, so it reads as the button you are moving */
 .selbar.dragging .sel-hint,
 .selbar.dragging .sel-x {
   opacity: 0;
@@ -794,6 +795,7 @@ h1, h2 {
 .note-scroll {
   flex: 1;
   min-height: 0;
+  touch-action: pan-y; /* always: iOS can keep an old touch-action on the text after a change, see below */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -804,7 +806,6 @@ h1, h2 {
 
 .drawer.show-meta .note-scroll {
   overflow-y: auto;
-  touch-action: pan-y;
   overscroll-behavior: contain;
 }
 
@@ -817,8 +818,9 @@ h1, h2 {
 .drawer.show-meta .grab { height: 18px; }
 .drawer.show-meta .grab span { margin-top: 7px; }
 
-/* A sheet smaller than the screen moves with the finger instead of scrolling the note (see app.js) */
-.drawer.small #item-body { touch-action: none; }
+/* A sheet smaller than the screen moves with the finger instead of scrolling the note. app.js
+   does that by cancelling the touch, not with touch-action: none here, because iOS kept that
+   touch-action on the words after the note went full page, and a swipe on text then did nothing. */
 
 /* With the formatting bar showing there has to be room under the last line */
 .drawer.show-meta #item-body {
@@ -1336,7 +1338,7 @@ h1, h2 {
 .menu-scrim {
   position: absolute;
   inset: 0;
-  z-index: 7; /* transparent, only there to catch outside taps */
+  z-index: 8; /* transparent, only there to catch outside taps; above the full-screen pages, as the menu can open over All lists */
 }
 
 .menu {
@@ -1420,6 +1422,12 @@ h1, h2 {
 }
 
 .screen > .header .tile { margin-right: 4px; }
+/* All lists has the same header as a list: icon, name, then search and the menu */
+#all-lists > .header { gap: 10px; }
+#all-lists > .header .tile { margin-right: 0; }
+
+/* Opened from All lists, the menu leaves out what is about one list */
+.menu.from-all .about-list { display: none; }
 .screen > .header h2 { line-height: 38px; }
 
 /* "5 lists", "3 results": the small label above a full-screen list */
