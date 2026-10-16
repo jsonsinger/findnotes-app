@@ -2301,6 +2301,42 @@ h1, h2 {
 .has-update #menu-btn::after { position: absolute; top: 6px; right: 6px; }
 .has-update .menu [data-action='settings']::after { margin-left: auto; }
 
+/* ---------- Theme change ----------
+   app.js (changeLook) adds this over everything when the theme or style changes: the new
+   background grows from the tapped button as a circle, the flame draws in the middle, then it
+   fades. .theme-cover is a plain full-screen layer in the new colour, added once the circle
+   covers the screen, because iOS 26 only picks up a new status bar colour when a layer appears. */
+.theme-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.theme-cover { position: absolute; inset: 0; }
+
+.theme-blob {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+}
+
+.theme-flame {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* pathLength="1", so a dash of 1 is the whole line */
+.theme-flame path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+
 /* ---------- Opening screen ----------
    While the app starts (index.html, #boot), the flame draws itself in one line and the name
    appears under it. It starts on the phone's own white or black (what iOS shows before the page
