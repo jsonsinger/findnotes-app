@@ -146,6 +146,20 @@ button {
   text-align: left;
 }
 
+/* iOS 26 only re-reads the status bar colour when a layer at the top appears or goes away,
+   not when the page colour changes. After a theme change this strip shows for a moment in
+   the new colour, so the status bar picks it up. Behind everything, so nothing is seen. */
+.tint-refresh {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background-color: var(--bg);
+    pointer-events: none;
+    z-index: 0;
+}
+
 /* The three rows: header, scrolling content, add bar */
 /* Fixed to the screen, so the browser can't pan it when the keyboard opens.
    JavaScript shrinks it to the space above the keyboard (fitViewport).
