@@ -1995,6 +1995,7 @@ h1, h2 {
 /* Show icons off: no icon next to list names */
 .no-icons .who .tile,
 .no-icons .all-row .tile,
+.no-icons #all-lists > .header .tile,
 .no-icons .arch-row .tile,
 .no-icons .menu button .icon,
 .no-icons .meta-icon {
