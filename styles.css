@@ -2307,8 +2307,9 @@ h1, h2 {
 /* ---------- Theme change ----------
    app.js (changeLook) adds this over everything when the theme or style changes: the new
    background grows from the tapped button as a circle, the flame draws in the middle, then it
-   fades. .theme-cover is a plain full-screen layer in the new colour, added once the circle
-   covers the screen, because iOS 26 only picks up a new status bar colour when a layer appears. */
+   fades. .theme-cover is a separate fixed full-screen layer in the new colour, added once the
+   circle covers the screen: iOS 26 takes the status bar colour only from a fixed layer's own
+   background-color, as it appears. It sits under the wash so the flame stays on top. */
 .theme-wash {
   position: fixed;
   inset: 0;
@@ -2319,7 +2320,7 @@ h1, h2 {
   pointer-events: none;
 }
 
-.theme-cover { position: absolute; inset: 0; }
+.theme-cover { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
 
 .theme-blob {
   position: absolute;

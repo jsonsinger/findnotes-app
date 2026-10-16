@@ -2500,7 +2500,8 @@ function changeLook(origin, change) {
   const wash = document.createElement('div');
   wash.className = 'theme-wash';
   wash.setAttribute('aria-hidden', 'true');
-  const done = () => { wash.remove(); themeBusy = false; };
+  let cover = null;
+  const done = () => { wash.remove(); cover?.remove(); themeBusy = false; };
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     wash.style.backgroundColor = to.bg;
@@ -2535,16 +2536,19 @@ function changeLook(origin, change) {
 
   blob.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 520, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' })
     .finished.then(() => {
-      // Covered: switch the app underneath, and show a full-screen layer in the new colour so
-      // the status bar picks it up
-      const cover = document.createElement('div');
+      // Covered: switch the app underneath, and add a fixed full-screen layer of its own in the
+      // new colour. iOS 26 only takes a status bar colour from a fixed layer's background-color,
+      // as that layer appears; the circle and the wash don't count.
+      cover = document.createElement('div');
       cover.className = 'theme-cover';
+      cover.setAttribute('aria-hidden', 'true');
       cover.style.backgroundColor = to.bg;
-      wash.prepend(cover);
+      document.body.append(cover);
       applyTheme();
     });
   path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 650, delay: 260, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' });
   setTimeout(() => {
+    cover?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
     wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' }).finished.then(done);
   }, 1000);
 }
