@@ -30,6 +30,19 @@ const el = {
   titleField: $('title-field'),
   titleMark: $('title-mark'),
   itemBody: $('item-body'),
+  noteMenuBtn: $('note-menu-btn'),
+  noteMenu: $('note-menu'),
+  hideTicked: $('hide-ticked'),
+  findBtn: $('find-btn'),
+  noteFind: $('note-find'),
+  findInput: $('find-input'),
+  findCount: $('find-count'),
+  findSteps: $('find-steps'),
+  findPrev: $('find-prev'),
+  findNext: $('find-next'),
+  findClose: $('find-close'),
+  findElsewhere: $('find-elsewhere'),
+  findAll: $('find-all'),
   noteScroll: $('note-scroll'),
   foot: $('drawer-top'),
   hintIcon: $('hint-icon'),
@@ -372,6 +385,7 @@ function addItem(title, body, extras = {}) {
     bookmarked: !!extras.bookmarked,
     marks: extras.marks || [],
   };
+  if (extras.hideTicked) item.hideTicked = true;
 
   state.items.push(item);
   render();
@@ -544,8 +558,9 @@ let hintTimer = 0; // keeps "Saved x min ago" current while the drawer is open
 
 // The description is a small rich-text editor that saves plain Markdown (see editor.js).
 const editor = createEditor(el.itemBody, {
-  onChange: () => { updateTrash(); scheduleSave(); },
+  onChange: () => { updateTrash(); scheduleSave(); if (findQuery()) runFind(false); refreshAllTicked(); },
   onSelection: () => syncToolbar(),
+  onTick: (b, done) => tickedNow(b, done),
 });
 const getBody = () => editor.getMarkdown();
 
@@ -704,13 +719,13 @@ const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeri
 function showDrawer(mode, item) {
   // `original` is what the item looked like when it opened, so a swipe-down can put it back
   drawer = {
-    mode, item, pending: false, bookmarked: !!item?.bookmarked, marks: [...(item?.marks || [])],
+    mode, item, pending: false, bookmarked: !!item?.bookmarked, marks: [...(item?.marks || [])], hideTicked: !!item?.hideTicked,
     original: item && { title: item.title, marks: item.marks || [], body: item.body, updatedAt: item.updatedAt },
   };
   hideToast();
 
   const draft = mode === 'add' ? readDraft() : null; // an unfinished note comes back
-  if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.marks = Array.isArray(draft.marks) ? draft.marks : []; drawer.savedAt = draft.t; }
+  if (draft) { drawer.hideTicked = !!draft.hideTicked; drawer.bookmarked = !!draft.bookmarked; drawer.marks = Array.isArray(draft.marks) ? draft.marks : []; drawer.savedAt = draft.t; }
   el.itemTitle.value = item ? item.title : draft?.title ?? '';
   drawer.titleWas = el.itemTitle.value;
   editor.setMarkdown(item ? item.body : draft?.body ?? '');
@@ -720,6 +735,8 @@ function showDrawer(mode, item) {
   el.metaList.textContent = currentList().name;
   el.metaIcon.setAttribute('href', iconHref(currentList()));
   setBookmark(drawer.bookmarked);
+  resetFind();
+  applyHideTicked();
   syncTitleMark();
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
@@ -750,6 +767,8 @@ const openEdit = (item) => showDrawer('edit', item);
 
 function hideDrawer() {
   cancelSave();
+  closeNoteMenu();
+  resetFind();
   clearInterval(hintTimer);
   el.itemTitle.blur();
   el.itemBody.blur();
@@ -783,7 +802,7 @@ function saveEdit() {
     const title = el.itemTitle.value;
     const body = getBody();
     const empty = !title.trim() && !body.trim();
-    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, t: Date.now() });
+    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, hideTicked: drawer.hideTicked, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
     drawer.pending = false;
     if (empty) refreshHint();
@@ -838,7 +857,7 @@ function closeDrawer() {
   if (drawer.mode === 'add') {
     if (el.itemTitle.value.trim()) {
       const { title, marks } = trimmedTitle();
-      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked, marks });
+      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked, marks, hideTicked: drawer.hideTicked });
       writeDraft(null);
     }
   } else {
@@ -850,6 +869,190 @@ function closeDrawer() {
   }
   hideDrawer();
 }
+
+/* ---------- the note's own menu (⋯) and search ---------- */
+
+// Hide ticked items, remembered for each note. A box you tick stays a moment, then folds away.
+const LINGER_MS = 1000;
+const lingering = new WeakMap(); // block -> its timer
+
+function applyHideTicked() {
+  const on = !!drawer?.hideTicked;
+  el.itemBody.classList.toggle('hide-ticked', on);
+  el.hideTicked.setAttribute('aria-checked', String(on));
+  el.hideTicked.querySelector('.switch').setAttribute('aria-checked', String(on));
+  if (!on) for (const b of el.itemBody.querySelectorAll('.linger')) b.classList.remove('linger');
+  refreshAllTicked();
+}
+
+// "Everything here is ticked off." once every tick box has been ticked and folded away
+function refreshAllTicked() {
+  const tasks = [...el.itemBody.querySelectorAll('.b.task')];
+  const all = !!drawer?.hideTicked && !findQuery() && tasks.length > 0
+    && tasks.every((b) => b.dataset.done && !b.classList.contains('linger'));
+  el.itemBody.classList.toggle('all-ticked', all);
+}
+
+function tickedNow(b, done) {
+  clearTimeout(lingering.get(b));
+  if (!done || !drawer?.hideTicked) { b.classList.remove('linger'); refreshAllTicked(); return; }
+  b.classList.add('linger');
+  const sheet = drawer;
+  lingering.set(b, setTimeout(() => {
+    if (drawer !== sheet || !b.classList.contains('linger')) return;
+    const end = () => { b.classList.remove('linger'); refreshAllTicked(); };
+    if (prefersReducedMotion()) { end(); return; }
+    const h = `${b.offsetHeight}px`;
+    b.animate([
+      { maxHeight: h, opacity: 1, overflow: 'hidden' },
+      { opacity: 0.2, transform: 'translateY(4px)', offset: 0.4 },
+      { maxHeight: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0, transform: 'translateY(8px)', overflow: 'hidden' },
+    ], { duration: 450, easing: 'cubic-bezier(.5,0,.2,1)' }).finished.then(end, end);
+  }, LINGER_MS));
+}
+
+function openNoteMenu() {
+  el.noteMenu.style.top = `${el.foot.offsetTop + el.foot.offsetHeight + 2}px`;
+  el.noteMenu.hidden = false;
+  el.noteMenuBtn.setAttribute('aria-expanded', 'true');
+}
+function closeNoteMenu() {
+  el.noteMenu.hidden = true;
+  el.noteMenuBtn.setAttribute('aria-expanded', 'false');
+}
+el.noteMenuBtn.addEventListener('click', () => (el.noteMenu.hidden ? openNoteMenu() : closeNoteMenu()));
+// A tap anywhere else closes it
+document.addEventListener('pointerdown', (e) => {
+  if (!el.noteMenu.hidden && !e.target.closest('#note-menu, #note-menu-btn')) closeNoteMenu();
+}, true);
+
+el.hideTicked.addEventListener('click', () => {
+  if (!drawer) return;
+  drawer.hideTicked = !drawer.hideTicked;
+  // A way of looking at the note, not an edit: saved straight away, without touching "Saved ..."
+  if (drawer.mode === 'edit') {
+    if (drawer.hideTicked) drawer.item.hideTicked = true; else delete drawer.item.hideTicked;
+    save(db.put('items', drawer.item));
+  } else if (readDraft()) saveEdit();
+  applyHideTicked();
+});
+
+// Search this note: every match is picked out, the current one in gold. Ticked items that
+// are hidden show while they match. Nothing in the note changes: the marks are drawn by the
+// browser (CSS highlights) on top of the text.
+const finder = { ranges: [], at: 0 };
+const canHighlight = typeof Highlight === 'function' && !!window.CSS?.highlights;
+const findQuery = () => (el.noteFind.hidden ? '' : el.findInput.value.trim());
+
+function runFind(fresh = true) {
+  const query = findQuery();
+  for (const b of el.itemBody.querySelectorAll('.hit')) b.classList.remove('hit');
+  finder.ranges = [];
+  if (query) {
+    for (const b of el.itemBody.children) {
+      // The line's text, and where each piece of it lives
+      const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+      const pieces = [];
+      let text = '';
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) { pieces.push([n, text.length]); text += n.nodeValue; }
+      const folded = fold(text);
+      const same = folded.length === text.length; // folding kept the length, so positions still line up
+      const hay = same ? folded : text.toLowerCase();
+      const q = same ? fold(query) : query.toLowerCase();
+      const spot = (i, end) => {
+        let k = pieces.length - 1;
+        while (k > 0 && (end ? pieces[k][1] >= i : pieces[k][1] > i)) k--;
+        return [pieces[k][0], i - pieces[k][1]];
+      };
+      for (let i = hay.indexOf(q); i !== -1; i = hay.indexOf(q, i + q.length)) {
+        const r = document.createRange();
+        r.setStart(...spot(i, false));
+        r.setEnd(...spot(i + q.length, true));
+        finder.ranges.push(r);
+        b.classList.add('hit');
+      }
+    }
+  }
+  if (fresh) finder.at = 0;
+  finder.at = Math.min(finder.at, Math.max(0, finder.ranges.length - 1));
+  paintFind();
+  refreshAllTicked();
+  if (fresh) showMatch();
+}
+
+function paintFind() {
+  const n = finder.ranges.length;
+  if (canHighlight) {
+    if (n) CSS.highlights.set('find', new Highlight(...finder.ranges)); else CSS.highlights.delete('find');
+    if (n) CSS.highlights.set('find-now', new Highlight(finder.ranges[finder.at])); else CSS.highlights.delete('find-now');
+  }
+  el.findCount.textContent = !n ? '' : n === 1 ? '1 match' : `${finder.at + 1} of ${n}`;
+  el.findSteps.hidden = n < 2;
+  el.findElsewhere.hidden = !findQuery() || n > 0;
+}
+
+// Scroll the current match into view, a third of the way down
+function showMatch() {
+  const r = finder.ranges[finder.at];
+  if (!r) return;
+  const box = r.getBoundingClientRect();
+  const scroller = noteScroller();
+  const view = scroller.getBoundingClientRect();
+  if (box.top < view.top + 8 || box.bottom > view.bottom - 8) scroller.scrollTop += box.top - view.top - view.height / 3;
+}
+
+function stepFind(by) {
+  const n = finder.ranges.length;
+  if (n < 2) return;
+  finder.at = (finder.at + by + n) % n;
+  paintFind();
+  showMatch();
+}
+
+function openFind() {
+  if (!drawer) return;
+  closeNoteMenu();
+  el.foot.hidden = true;
+  el.noteFind.hidden = false;
+  el.findInput.value = '';
+  runFind();
+  el.findInput.focus({ preventScroll: true });
+}
+
+// Back to how it was: no search, no marks
+function resetFind() {
+  el.noteFind.hidden = true;
+  el.foot.hidden = false;
+  el.findInput.value = '';
+  runFind();
+}
+
+function closeFind() {
+  if (el.noteFind.hidden) return;
+  el.findInput.blur();
+  resetFind();
+}
+
+el.findBtn.addEventListener('click', openFind);
+el.findClose.addEventListener('click', closeFind);
+el.findInput.addEventListener('input', () => runFind());
+el.findInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  if (finder.ranges.length > 1) stepFind(1); else el.findInput.blur(); // one match: put the keyboard away to see it
+});
+for (const [button, by] of [[el.findPrev, -1], [el.findNext, 1]]) {
+  button.addEventListener('mousedown', (e) => e.preventDefault()); // keep the keyboard up
+  button.addEventListener('click', () => stepFind(by));
+}
+// Not in this note: look everywhere instead, keeping what you wrote
+el.findAll.addEventListener('click', () => {
+  const query = el.findInput.value.trim();
+  if (drawer?.mode === 'add') dismissDrawer(); else closeDrawer();
+  openSearch();
+  el.searchInput.value = query;
+  renderSearch();
+});
 
 el.add.addEventListener('click', openAdd);
 el.scrim.addEventListener('click', dismissDrawer);
@@ -919,6 +1122,8 @@ const LAYERS = [
   { open: () => !el.allLists.hidden, close: () => closeAll() },
   { open: () => !el.listbar.hidden, close: () => closeListBar() },
   { open: () => selection.size > 0, close: () => clearSelection() },
+  { open: () => !el.noteMenu.hidden, close: () => closeNoteMenu() },
+  { open: () => !el.noteFind.hidden, close: () => closeFind() },
   { open: () => !!drawer, close: () => dismissDrawer() }, // discards edits, like swiping down
 ];
 const closeTop = () => LAYERS.find((layer) => layer.open())?.close();
@@ -2806,6 +3011,7 @@ function cleanItem(i, index) {
     const ranges = i.marks.filter((m) => Array.isArray(m) && Number.isInteger(m[0]) && Number.isInteger(m[1]));
     item.marks = tidyMarks(ranges.slice(0, 100).map(([a, b]) => [a, b]), item.title.length);
   }
+  if (i.hideTicked === true) item.hideTicked = true;
   if (Number.isFinite(i.archivedAt)) item.archivedAt = i.archivedAt;
   if (isId(i.archivedWith)) item.archivedWith = i.archivedWith;
   return item;
