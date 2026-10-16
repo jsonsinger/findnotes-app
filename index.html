@@ -94,6 +94,12 @@
     <symbol id="i-arrow" viewBox="0 0 24 24">
         <path d="M5 12h14M13 6l6 6-6 6"/>
     </symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24">
+        <path d="M5 9h14M5 15h14"/>
+    </symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24">
+        <path d="M4 8h14l-3-3M20 16H6l3 3"/>
+    </symbol>
     <symbol id="i-close" viewBox="0 0 24 24">
         <path d="M6 6l12 12M18 6L6 18"/>
     </symbol>
@@ -299,6 +305,7 @@
      <button class="about-list" data-action="all"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg>All lists</button>
      <button data-action="new"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>New list</button>
      <button class="about-list" data-action="edit"><svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg>Edit list</button>
+     <button data-action="reorder"><svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg>Reorder</button>
      <hr>
      <button class="about-list" data-action="archive-this" id="menu-archive-this"><svg class="icon" aria-hidden="true"><use href="#i-archive-in"/></svg>Archive this list</button>
      <button data-action="archive"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg>View archive</button>
@@ -336,6 +343,20 @@
        <span>Add a list</span>
        <span class="addbar-plus" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span>
      </button>
+   </section>
+   <section class="screen" id="reorder" role="dialog" aria-modal="true" aria-label="Reorder" hidden>
+     <header class="header">
+       <span class="tile"><svg class="icon" aria-hidden="true"><use id="reorder-icon" href="#i-flame"/></svg></span>
+       <h2 id="reorder-title">All lists</h2>
+       <button class="icon-btn" id="reorder-flip" aria-label="Move the grips to the other side">
+         <svg class="icon" aria-hidden="true"><use href="#i-flip"/></svg>
+       </button>
+       <button class="done-pill" id="reorder-done">Done</button>
+     </header>
+     <div class="screen-body" id="reorder-body">
+       <h3 class="list-label">Drag to reorder</h3>
+       <div id="reorder-rows" role="list"></div>
+     </div>
    </section>
    <section class="screen" id="archive" role="dialog" aria-modal="true" aria-label="Archive" hidden>
      <header class="header">

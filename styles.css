@@ -1504,6 +1504,44 @@ h1, h2 {
 #all-lists > .header { gap: 10px; }
 #all-lists > .header .tile { margin-right: 0; }
 
+/* Reorder: rows held by their grips */
+#reorder .screen-body { padding-left: 16px; padding-right: 16px; }
+.re-row { position: relative; min-height: 57px; padding: 6px 2px; background: var(--bg); }
+.re-row .circle { flex: none; width: 22px; height: 22px; margin: 0 6px 0 4px; }
+.re-row.done .circle { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.re-row.done .circle .icon { display: block; }
+.re-row.done .all-name { color: var(--text-muted); text-decoration: line-through; font-weight: 500; }
+.re-row:not(:has(.tile)) .all-name { font-weight: 500; }
+.grip {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.grips-left .grip { order: -1; margin: 0 -6px 0 -10px; }
+.flipping .grip { animation: grip-in 0.3s ease; }
+@keyframes grip-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+/* The row you hold: a soft grey, no shadow */
+.re-row.lifted { z-index: 2; background: var(--surface); border-radius: 10px; border-bottom-color: transparent; }
+.re-row.lifted .grip { color: var(--accent-text); cursor: grabbing; }
+.done-pill {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+
 /* Opened from All lists, the menu leaves out what is about one list */
 .menu.from-all .about-list { display: none; }
 .screen > .header h2 { line-height: 38px; }
@@ -2286,6 +2324,9 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] .re-row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] .re-row.lifted { background: #eef0f4; }
+[data-style='sketch'] .done-pill { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
 [data-style='sketch'] #done[data-phase]::before { display: none; } /* Sketch draws its own wobbly circle */
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 

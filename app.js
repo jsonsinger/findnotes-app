@@ -59,6 +59,13 @@ const el = {
   menuScrim: $('menu-scrim'),
   menu: $('menu'),
   allLists: $('all-lists'),
+  reorder: $('reorder'),
+  reorderIcon: $('reorder-icon'),
+  reorderTitle: $('reorder-title'),
+  reorderFlip: $('reorder-flip'),
+  reorderDone: $('reorder-done'),
+  reorderBody: $('reorder-body'),
+  reorderRows: $('reorder-rows'),
   allSearchBtn: $('all-search-btn'),
   allMenuBtn: $('all-menu-btn'),
   allRows: $('all-rows'),
@@ -409,7 +416,7 @@ function lockBackground() {
 
 // A full-screen page can open another over itself (All lists has search and the menu), so
 // the background stays locked until the last of them has closed.
-const screens = () => [el.allLists, el.archive, el.search, el.settings];
+const screens = () => [el.allLists, el.archive, el.search, el.settings, el.reorder];
 
 function unlockBackground() {
   if (screens().some((node) => !node.hidden)) return;
@@ -1114,6 +1121,7 @@ const LAYERS = [
   { open: () => !el.menu.hidden, close: () => closeMenu() },
   { open: () => !el.listEdit.hidden, close: () => finishRename(false) },
   { open: () => !el.search.hidden, close: () => closeSearch() },
+  { open: () => !el.reorder.hidden, close: () => closeReorder() },
   { open: () => !el.resetbar.hidden, close: () => closeResetBar() },
   { open: () => !el.cleanupbar.hidden, close: () => closeCleanupBar() },
   { open: () => !el.archive.hidden && arch.mode !== 'idle', close: () => { if (arch.mode === 'pick') { arch.picks.clear(); setArchMode('idle'); } else archBack(); } },
@@ -1577,8 +1585,180 @@ el.menu.addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
   closeMenu();
-  ({ all: openAll, new: newList, edit: startRename, 'archive-this': openListBar, archive: openArchive, settings: openSettings })[action]();
+  const fromAll = el.menu.classList.contains('from-all');
+  ({ all: openAll, new: newList, edit: startRename, reorder: () => openReorder(fromAll), 'archive-this': openListBar, archive: openArchive, settings: openSettings })[action]();
 });
+
+/* ---------- Reorder: the lists (from All lists), or the items of a list ---------- */
+
+// The rows move with your finger by their grips. Grips sit on the right; ⇄ moves them left.
+const GRIPS_KEY = 'find-notes:grips'; // 'left', or nothing for the right
+let reorder = null; // while open: { store: 'lists' | 'items', things, slots }
+
+function gripsLeft() {
+  try { return localStorage.getItem(GRIPS_KEY) === 'left'; } catch { return false; }
+}
+
+function openReorder(lists) {
+  const list = currentList();
+  const things = lists ? [...state.lists] : itemsOf(list.id);
+  // The order numbers already in use, handed out again in the new order. Archived items keep
+  // their numbers, so one restored later still lands near where it was.
+  reorder = { store: lists ? 'lists' : 'items', things, slots: things.map((t) => t.order).sort((a, b) => a - b) };
+  el.reorderTitle.textContent = lists ? 'All lists' : list.name;
+  el.reorderIcon.setAttribute('href', lists ? '#i-flame' : iconHref(list));
+  el.reorderRows.classList.toggle('grips-left', gripsLeft());
+  if (things.length) el.reorderRows.replaceChildren(...things.map(reorderRow));
+  else {
+    const none = document.createElement('p');
+    none.className = 'search-empty';
+    none.textContent = 'Nothing to reorder yet';
+    el.reorderRows.replaceChildren(none);
+  }
+  el.reorderBody.scrollTop = 0;
+  showScreen(el.reorder, el.reorderDone);
+}
+
+function closeReorder() {
+  if (lift) drop();
+  saveOrder();
+  reorder = null;
+  hideScreen(el.reorder);
+  render();
+  if (!el.allLists.hidden) renderAll();
+}
+
+function reorderRow(thing) {
+  const row = document.createElement('div');
+  row.className = 'all-row re-row';
+  row.setAttribute('role', 'listitem');
+  row.dataset.id = thing.id;
+  const name = document.createElement('span');
+  name.className = 'all-name';
+  if (reorder.store === 'lists') {
+    // iconHref is always one of ours, so building the svg from a string is safe
+    row.insertAdjacentHTML('beforeend', `<span class="tile small"><svg class="icon" aria-hidden="true"><use href="${iconHref(thing)}"/></svg></span>`);
+    name.textContent = thing.name;
+    const count = document.createElement('span');
+    count.className = 'all-count';
+    count.textContent = String(state.items.filter((i) => i.listId === thing.id && !i.done).length);
+    row.append(name, count);
+  } else {
+    row.classList.toggle('done', !!thing.done);
+    row.insertAdjacentHTML('beforeend', '<span class="circle" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>');
+    name.textContent = thing.title;
+    row.append(name);
+  }
+  const grip = document.createElement('button');
+  grip.className = 'grip';
+  grip.setAttribute('aria-label', `Move ${thing.name ?? thing.title}`);
+  grip.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg>';
+  row.append(grip);
+  return row;
+}
+
+// Writes the new order. Only the rows whose number changed are saved.
+function saveOrder() {
+  if (!reorder) return;
+  const byId = new Map(reorder.things.map((t) => [t.id, t]));
+  const changed = [];
+  [...el.reorderRows.querySelectorAll('.re-row')].forEach((row, i) => {
+    const thing = byId.get(row.dataset.id);
+    if (thing && thing.order !== reorder.slots[i]) { thing.order = reorder.slots[i]; changed.push(thing); }
+  });
+  if (!changed.length) return;
+  if (reorder.store === 'lists') state.lists.sort((a, b) => a.order - b.order);
+  save(db.batch({ put: changed.map((t) => [reorder.store, t]) }));
+}
+
+// A row that has just been passed slides into its new place
+const slideRow = (row, from) => row.animate([{ transform: `translateY(${from}px)` }, { transform: 'none' }],
+  { duration: prefersReducedMotion() ? 1 : 200, easing: 'cubic-bezier(.2,.8,.2,1)' });
+
+let lift = null; // the row being dragged: { id, row, y, top, at }
+
+el.reorderRows.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('.grip');
+  if (!grip || lift || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
+  grip.setPointerCapture(e.pointerId);
+  lift = { id: e.pointerId, row: grip.closest('.re-row'), y: e.clientY, top: el.reorderBody.scrollTop, at: e.clientY };
+  lift.row.classList.add('lifted');
+  requestAnimationFrame(edgeScroll);
+});
+
+el.reorderRows.addEventListener('pointermove', (e) => {
+  if (!lift || e.pointerId !== lift.id) return;
+  lift.at = e.clientY;
+  follow();
+});
+
+// Moves the held row with the finger, and swaps it past any row it is more than half over
+function follow() {
+  const { row } = lift;
+  let dy = lift.at - lift.y + el.reorderBody.scrollTop - lift.top;
+  for (;;) {
+    const next = row.nextElementSibling;
+    const prev = row.previousElementSibling;
+    if (next && dy > next.offsetHeight / 2) {
+      const h = next.offsetHeight;
+      next.after(row); lift.y += h; dy -= h; slideRow(next, h);
+    } else if (prev && dy < -prev.offsetHeight / 2) {
+      const h = prev.offsetHeight;
+      prev.before(row); lift.y -= h; dy += h; slideRow(prev, -h);
+    } else break;
+  }
+  row.style.transform = `translateY(${dy}px)`;
+}
+
+// Held near the top or bottom edge, the page scrolls to bring more rows into reach
+function edgeScroll() {
+  if (!lift) return;
+  const box = el.reorderBody.getBoundingClientRect();
+  const speed = lift.at < box.top + 64 ? -8 : lift.at > box.bottom - 64 ? 8 : 0;
+  if (speed) {
+    const before = el.reorderBody.scrollTop;
+    el.reorderBody.scrollTop += speed;
+    if (el.reorderBody.scrollTop !== before) follow();
+  }
+  requestAnimationFrame(edgeScroll);
+}
+
+function drop() {
+  const { row } = lift;
+  lift = null;
+  const dy = parseFloat(row.style.transform.slice(11)) || 0; // translateY(…px)
+  row.style.transform = '';
+  if (dy) slideRow(row, dy);
+  setTimeout(() => row.classList.remove('lifted'), 180);
+  saveOrder();
+}
+
+for (const type of ['pointerup', 'pointercancel']) {
+  el.reorderRows.addEventListener(type, (e) => { if (lift && e.pointerId === lift.id) drop(); });
+}
+
+// With a keyboard, the arrow keys move the focused grip's row
+el.reorderRows.addEventListener('keydown', (e) => {
+  const row = e.target.closest('.grip')?.closest('.re-row');
+  if (!row || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const other = e.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+  if (!other) return;
+  if (e.key === 'ArrowUp') other.before(row); else other.after(row);
+  e.target.focus();
+  saveOrder();
+});
+
+el.reorderFlip.addEventListener('click', () => {
+  const left = !el.reorderRows.classList.contains('grips-left');
+  el.reorderRows.classList.toggle('grips-left', left);
+  el.reorderRows.classList.remove('flipping');
+  void el.reorderRows.offsetWidth; // restart the grips' little pop-in
+  el.reorderRows.classList.add('flipping');
+  try { if (left) localStorage.setItem(GRIPS_KEY, 'left'); else localStorage.removeItem(GRIPS_KEY); } catch { /* not remembered, that's all */ }
+});
+el.reorderDone.addEventListener('click', closeReorder);
 
 /* ---------- the All lists screen ---------- */
 
