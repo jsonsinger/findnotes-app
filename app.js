@@ -2500,7 +2500,8 @@ function changeLook(origin, change) {
   const wash = document.createElement('div');
   wash.className = 'theme-wash';
   wash.setAttribute('aria-hidden', 'true');
-  const done = () => { wash.remove(); themeBusy = false; };
+  let cover = null;
+  const done = () => { wash.remove(); cover?.remove(); themeBusy = false; };
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     wash.style.backgroundColor = to.bg;
@@ -2535,16 +2536,19 @@ function changeLook(origin, change) {
 
   blob.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 520, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' })
     .finished.then(() => {
-      // Covered: switch the app underneath, and show a full-screen layer in the new colour so
-      // the status bar picks it up
-      const cover = document.createElement('div');
+      // Covered: switch the app underneath, and add a fixed full-screen layer of its own in the
+      // new colour. iOS 26 only takes a status bar colour from a fixed layer's background-color,
+      // as that layer appears; the circle and the wash don't count.
+      cover = document.createElement('div');
       cover.className = 'theme-cover';
+      cover.setAttribute('aria-hidden', 'true');
       cover.style.backgroundColor = to.bg;
-      wash.prepend(cover);
+      document.body.append(cover);
       applyTheme();
     });
   path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 650, delay: 260, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' });
   setTimeout(() => {
+    cover?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
     wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' }).finished.then(done);
   }, 1000);
 }
@@ -2945,6 +2949,7 @@ function setupOffline() {
 const AUTOUPDATE_KEY = 'find-notes:autoupdate';
 let swReg = null;
 let checking = ''; // what Check found, shown under the version
+let waitingVersion = ''; // the version that is ready to go in, once known
 let busy = false;
 let autoUpdate = false;
 try { autoUpdate = localStorage.getItem(AUTOUPDATE_KEY) === 'on'; } catch { /* storage blocked: off */ }
@@ -2957,6 +2962,7 @@ const isSmallUpdate = (from, to) => {
 // opening: the app has just started or come back, so nothing is half done
 async function updateReady(opening) {
   markUpdate();
+  if (swReg?.waiting) workerVersion(swReg.waiting).then((v) => { waitingVersion = v; markUpdate(); });
   if (!autoUpdate || !opening || !swReg?.waiting) return;
   const [from, to] = await Promise.all([appVersion(), workerVersion(swReg.waiting)]);
   if (isSmallUpdate(from, to)) installUpdate();
@@ -2975,7 +2981,7 @@ function markUpdate() {
   el.updateBtn.classList.toggle('sure', ready);
   el.updateBtn.disabled = !ready && (busy || !!swReg?.installing);
   el.updateNote.textContent = !swReg ? 'Updates are off on this computer'
-    : ready ? 'A new version is ready'
+    : ready ? (waitingVersion ? waitingVersion + ' is ready' : 'A new version is ready')
     : swReg.installing ? 'Getting the new version'
     : checking;
 }
@@ -3001,6 +3007,18 @@ el.autoupdateSwitch.addEventListener('click', () => {
   try { localStorage.setItem(AUTOUPDATE_KEY, autoUpdate ? 'on' : 'off'); } catch { /* storage blocked: this visit only */ }
   markUpdate();
 });
+
+// After a big update (more than the last number changed, 0.0.47 to 0.1.0) say so once, so it
+// is never silent. Small ones only show the dots beforehand.
+const SEEN_VERSION_KEY = 'find-notes:seen-version';
+function noteNewVersion() {
+  appVersion().then((now) => {
+    if (now === 'Unknown') return;
+    let seen = null;
+    try { seen = localStorage.getItem(SEEN_VERSION_KEY); localStorage.setItem(SEEN_VERSION_KEY, now); } catch { return; }
+    if (seen && seen !== now && !isSmallUpdate(seen, now)) showToast('Updated to ' + now, null, 5000);
+  });
+}
 
 /* ---------- start ---------- */
 
@@ -3040,12 +3058,12 @@ async function init() {
 const BOOT_MIN_MS = 1700;
 function hideBoot() {
   const boot = document.getElementById('boot');
-  if (!boot) return;
+  if (!boot) { noteNewVersion(); return; }
   // performance.now() counts from when the app started opening
   const wait = prefersReducedMotion() ? 0 : Math.max(0, BOOT_MIN_MS - performance.now());
   setTimeout(() => {
     boot.classList.add('done');
-    setTimeout(() => boot.remove(), 400); // after the fade in styles.css
+    setTimeout(() => { boot.remove(); noteNewVersion(); }, 400); // after the fade in styles.css
   }, wait);
 }
 
