@@ -2770,11 +2770,16 @@ el.importFile.addEventListener('change', async (e) => {
 /* ---------- the Back button (Android) closes what is on top instead of leaving the app ---------- */
 
 // One history entry stands in for "something is open". Back removes it and we close the top layer.
+// iPhones and iPads have no Back button, and any history there turns a swipe from the screen edge
+// into a browser back or forward that drags in a snapshot of an earlier screen. So they keep none.
+const noBackButton = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let marker = false;
 let ignorePops = 0;
 let backTimer = 0;
 
 function syncHistory() {
+  if (noBackButton) return;
   if (overlayOpen()) {
     clearTimeout(backTimer);
     if (!marker) { history.pushState({ overlay: true }, ''); marker = true; }
