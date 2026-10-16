@@ -2478,20 +2478,92 @@ function markTheme() {
   el.sketchSwitch.setAttribute('aria-checked', String(sketch));
 }
 
-el.sketchSwitch.addEventListener('click', () => {
-  sketch = !sketch;
-  try { if (sketch) localStorage.setItem(STYLE_KEY, 'sketch'); else localStorage.removeItem(STYLE_KEY); } catch { /* storage blocked */ }
-  applyTheme();
+// The look a theme and style give: its background, and the flame's colour on it
+function lookFor(t, sk) {
+  if (sk) return { bg: '#f8f8ff', ink: '#2b2a26' };
+  const light = t === 'light' || (t === 'auto' && phoneIsLight.matches);
+  return light ? { bg: '#fbfbfa', ink: '#e0ad1f' } : { bg: '#15181a', ink: '#c9a95e' };
+}
+
+// Changing the theme: the new background grows from the tapped button, the flame draws in the
+// middle, then it all fades away. It is a fixed layer over the whole screen, like the opening
+// screen, so iOS 26 takes the new status bar colour from it as it appears.
+let themeBusy = false;
+function changeLook(origin, change) {
+  const from = lookFor(theme, sketch);
+  change();
+  const to = lookFor(theme, sketch);
   markTheme();
+  if (themeBusy || to.bg === from.bg) { applyTheme(); return; }
+  themeBusy = true;
+
+  const wash = document.createElement('div');
+  wash.className = 'theme-wash';
+  wash.setAttribute('aria-hidden', 'true');
+  const done = () => { wash.remove(); themeBusy = false; };
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    wash.style.backgroundColor = to.bg;
+    document.body.append(wash);
+    wash.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, fill: 'forwards' }).finished.then(() => {
+      applyTheme();
+      wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).finished.then(done);
+    });
+    return;
+  }
+
+  // A circle from the button's centre, big enough to reach the furthest corner
+  const r = origin.getBoundingClientRect();
+  const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const w = window.innerWidth, h = window.innerHeight;
+  const size = 2 * Math.max(Math.hypot(x, y), Math.hypot(w - x, y), Math.hypot(x, h - y), Math.hypot(w - x, h - y));
+  const blob = document.createElement('div');
+  blob.className = 'theme-blob';
+  Object.assign(blob.style, { left: (x - size / 2) + 'px', top: (y - size / 2) + 'px', width: size + 'px', height: size + 'px', backgroundColor: to.bg });
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const flame = document.createElementNS(svgNS, 'svg');
+  flame.setAttribute('class', 'theme-flame');
+  flame.setAttribute('viewBox', '0 0 24 24');
+  flame.style.stroke = to.ink;
+  const path = document.createElementNS(svgNS, 'path');
+  path.setAttribute('pathLength', '1');
+  path.setAttribute('d', 'M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z');
+  flame.append(path);
+  wash.append(blob, flame);
+  document.body.append(wash);
+
+  blob.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 520, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' })
+    .finished.then(() => {
+      // Covered: switch the app underneath, and show a full-screen layer in the new colour so
+      // the status bar picks it up
+      const cover = document.createElement('div');
+      cover.className = 'theme-cover';
+      cover.style.backgroundColor = to.bg;
+      wash.prepend(cover);
+      applyTheme();
+    });
+  path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 650, delay: 260, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' });
+  setTimeout(() => {
+    wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' }).finished.then(done);
+  }, 1000);
+}
+
+el.sketchSwitch.addEventListener('click', () => {
+  changeLook(el.sketchSwitch, () => {
+    sketch = !sketch;
+    try { if (sketch) localStorage.setItem(STYLE_KEY, 'sketch'); else localStorage.removeItem(STYLE_KEY); } catch { /* storage blocked */ }
+  });
 });
 
 el.themeSeg.addEventListener('click', (e) => {
-  const choice = e.target.closest('button')?.dataset.themeChoice;
-  if (!choice) return;
-  theme = choice;
-  try { localStorage.setItem(THEME_KEY, choice); } catch { /* storage blocked: applies for this visit only */ }
-  applyTheme();
-  markTheme();
+  const btn = e.target.closest('button');
+  const choice = btn?.dataset.themeChoice;
+  if (!choice || choice === theme) return;
+  changeLook(btn, () => {
+    theme = choice;
+    try { localStorage.setItem(THEME_KEY, choice); } catch { /* storage blocked: applies for this visit only */ }
+  });
 });
 
 // Show icons: off hides the icon next to each list, for a plainer look
