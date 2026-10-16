@@ -906,6 +906,84 @@ h1, h2 {
   text-decoration: line-through;
 }
 
+/* Hide ticked items (the note's ⋯ menu): a ticked line folds away after a moment (.linger),
+   but still shows, faded, while it matches a search (.hit) */
+#item-body.hide-ticked .b.task[data-done]:not(.linger, .hit) { display: none; }
+#item-body.hide-ticked .b.task[data-done].hit { opacity: 0.55; }
+#item-body.all-ticked::after {
+  content: 'Everything here is ticked off.';
+  display: block;
+  padding: 18px 0 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Search this note: every match, and the current one in gold */
+::highlight(find) { background-color: var(--accent-soft); color: inherit; }
+::highlight(find-now) { background-color: var(--accent); color: var(--on-accent); }
+
+.note-find {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 -8px 6px 0;
+  flex: none;
+}
+
+.note-find .search-field { height: 40px; padding: 0 6px 0 12px; }
+.note-find .search-input { font-size: 16px; } /* 16px or iOS zooms in */
+.find-count { flex: none; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.find-steps { display: flex; flex: none; }
+.find-steps button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  border-radius: 8px;
+}
+.find-steps .icon { width: 18px; height: 18px; }
+
+.find-elsewhere {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--tile-bg);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.find-elsewhere button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.find-elsewhere .icon { width: 14px; height: 14px; stroke-width: 2.2; }
+
+/* The note's ⋯ menu, under its top bar */
+.note-menu {
+  right: 12px;
+  width: 268px;
+  z-index: 6;
+}
+.note-menu button { justify-content: space-between; min-height: 52px; }
+.opt-text { white-space: nowrap; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; text-align: left; }
+.opt-text small { font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
+.note-menu .switch { width: 42px; height: 26px; }
+.note-menu .switch::after { top: 4px; left: 4px; width: 18px; height: 18px; }
+.note-menu .switch[aria-checked='true']::after { transform: translateX(16px); }
+#note-menu-btn[aria-expanded='true'] { background: var(--tile-bg); color: var(--text); }
+
 #item-body.is-empty .b:first-child::before {
   content: 'Add a description';
   position: absolute;
