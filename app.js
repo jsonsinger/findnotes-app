@@ -2945,6 +2945,7 @@ function setupOffline() {
 const AUTOUPDATE_KEY = 'find-notes:autoupdate';
 let swReg = null;
 let checking = ''; // what Check found, shown under the version
+let waitingVersion = ''; // the version that is ready to go in, once known
 let busy = false;
 let autoUpdate = false;
 try { autoUpdate = localStorage.getItem(AUTOUPDATE_KEY) === 'on'; } catch { /* storage blocked: off */ }
@@ -2957,6 +2958,7 @@ const isSmallUpdate = (from, to) => {
 // opening: the app has just started or come back, so nothing is half done
 async function updateReady(opening) {
   markUpdate();
+  if (swReg?.waiting) workerVersion(swReg.waiting).then((v) => { waitingVersion = v; markUpdate(); });
   if (!autoUpdate || !opening || !swReg?.waiting) return;
   const [from, to] = await Promise.all([appVersion(), workerVersion(swReg.waiting)]);
   if (isSmallUpdate(from, to)) installUpdate();
@@ -2975,7 +2977,7 @@ function markUpdate() {
   el.updateBtn.classList.toggle('sure', ready);
   el.updateBtn.disabled = !ready && (busy || !!swReg?.installing);
   el.updateNote.textContent = !swReg ? 'Updates are off on this computer'
-    : ready ? 'A new version is ready'
+    : ready ? (waitingVersion ? waitingVersion + ' is ready' : 'A new version is ready')
     : swReg.installing ? 'Getting the new version'
     : checking;
 }
@@ -3001,6 +3003,18 @@ el.autoupdateSwitch.addEventListener('click', () => {
   try { localStorage.setItem(AUTOUPDATE_KEY, autoUpdate ? 'on' : 'off'); } catch { /* storage blocked: this visit only */ }
   markUpdate();
 });
+
+// After a big update (more than the last number changed, 0.0.47 to 0.1.0) say so once, so it
+// is never silent. Small ones only show the dots beforehand.
+const SEEN_VERSION_KEY = 'find-notes:seen-version';
+function noteNewVersion() {
+  appVersion().then((now) => {
+    if (now === 'Unknown') return;
+    let seen = null;
+    try { seen = localStorage.getItem(SEEN_VERSION_KEY); localStorage.setItem(SEEN_VERSION_KEY, now); } catch { return; }
+    if (seen && seen !== now && !isSmallUpdate(seen, now)) showToast('Updated to ' + now, null, 5000);
+  });
+}
 
 /* ---------- start ---------- */
 
@@ -3040,12 +3054,12 @@ async function init() {
 const BOOT_MIN_MS = 1700;
 function hideBoot() {
   const boot = document.getElementById('boot');
-  if (!boot) return;
+  if (!boot) { noteNewVersion(); return; }
   // performance.now() counts from when the app started opening
   const wait = prefersReducedMotion() ? 0 : Math.max(0, BOOT_MIN_MS - performance.now());
   setTimeout(() => {
     boot.classList.add('done');
-    setTimeout(() => boot.remove(), 400); // after the fade in styles.css
+    setTimeout(() => { boot.remove(); noteNewVersion(); }, 400); // after the fade in styles.css
   }, wait);
 }
 
