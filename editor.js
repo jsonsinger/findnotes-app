@@ -65,7 +65,7 @@ const escapeText = (s) => s.replace(/[\\*]/g, '\\$&').replace(/=/g, (c, i, t) =>
 
 /* ---------- the editor ---------- */
 
-export function createEditor(root, { onChange = () => {}, onSelection = () => {}, onTick = () => {} } = {}) {
+export function createEditor(root, { onChange = () => {}, onSelection = () => {} } = {}) {
   root.setAttribute('contenteditable', 'true');
   root.setAttribute('role', 'textbox');
   root.setAttribute('aria-multiline', 'true');
@@ -319,54 +319,17 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
       const sel = getSelection();
       if (!sel.rangeCount || !sel.isCollapsed) return;
       const block = closestBlock(sel.anchorNode);
-      if (!block) return;
+      if (!block || typeOf(block) === 'p') return;
       const before = document.createRange();
       before.selectNodeContents(block);
       before.setEnd(sel.anchorNode, sel.anchorOffset);
-      if (before.toString() !== '') return;
-      if (typeOf(block) !== 'p') {
+      if (before.toString() === '') {
         e.preventDefault();
         setType(block, 'p');
         afterEdit();
-      } else if (block.previousElementSibling && hidden(block.previousElementSibling)) {
-        // The line above is folded away (Hide ticked items): join the line you can see instead
-        e.preventDefault();
-        const to = visibleSibling(block, 'previousElementSibling');
-        if (to) { joinInto(to, block); afterEdit(); }
       }
     }
-    // Delete at the end of a line, with the next one folded away: same thing, the other way
-    if (e.inputType === 'deleteContentForward') {
-      const sel = getSelection();
-      if (!sel.rangeCount || !sel.isCollapsed) return;
-      const block = closestBlock(sel.anchorNode);
-      if (!block || !block.nextElementSibling || !hidden(block.nextElementSibling)) return;
-      const after = document.createRange();
-      after.selectNodeContents(block);
-      after.setStart(sel.anchorNode, sel.anchorOffset);
-      if (after.toString() !== '') return;
-      e.preventDefault();
-      const from = visibleSibling(block, 'nextElementSibling');
-      if (from) { joinInto(block, from); afterEdit(); }
-    }
   });
-
-  // A line that isn't drawn at all (a ticked item folded away by Hide ticked items)
-  const hidden = (b) => !b.getClientRects().length;
-  const visibleSibling = (b, way) => {
-    for (let n = b[way]; n; n = n[way]) if (!hidden(n)) return n;
-    return null;
-  };
-  // Moves the words of `from` onto the end of `to`, with the caret where they meet
-  function joinInto(to, from) {
-    if (isEmptyBlock(to)) to.replaceChildren();
-    const join = document.createTextNode('');
-    to.append(join);
-    if (!isEmptyBlock(from)) to.append(...from.childNodes);
-    from.remove();
-    tidy(to);
-    if (join.isConnected) collapseTo(join, 0); else caretToStart(to);
-  }
 
   // Typing "- ", "* ", "# " or "[] " at the start of a line starts a bullet, heading or tick box.
   const SHORTCUTS = { '-': 'li', '*': 'li', '#': 'h', '##': 'h', '###': 'h3', '[]': 'task', '[ ]': 'task' };
@@ -429,7 +392,6 @@ export function createEditor(root, { onChange = () => {}, onSelection = () => {}
     boxTap = null;
     if (Math.hypot(e.clientX - x, e.clientY - y) > 8) return;
     if (b.dataset.done) delete b.dataset.done; else b.dataset.done = '1';
-    onTick(b, !!b.dataset.done);
     onChange();
     onSelection();
   });

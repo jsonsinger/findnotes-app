@@ -30,19 +30,6 @@ const el = {
   titleField: $('title-field'),
   titleMark: $('title-mark'),
   itemBody: $('item-body'),
-  noteMenuBtn: $('note-menu-btn'),
-  noteMenu: $('note-menu'),
-  hideTicked: $('hide-ticked'),
-  findBtn: $('find-btn'),
-  noteFind: $('note-find'),
-  findInput: $('find-input'),
-  findCount: $('find-count'),
-  findSteps: $('find-steps'),
-  findPrev: $('find-prev'),
-  findNext: $('find-next'),
-  findClose: $('find-close'),
-  findElsewhere: $('find-elsewhere'),
-  findAll: $('find-all'),
   noteScroll: $('note-scroll'),
   foot: $('drawer-top'),
   hintIcon: $('hint-icon'),
@@ -59,6 +46,13 @@ const el = {
   menuScrim: $('menu-scrim'),
   menu: $('menu'),
   allLists: $('all-lists'),
+  reorder: $('reorder'),
+  reorderIcon: $('reorder-icon'),
+  reorderTitle: $('reorder-title'),
+  reorderFlip: $('reorder-flip'),
+  reorderDone: $('reorder-done'),
+  reorderBody: $('reorder-body'),
+  reorderRows: $('reorder-rows'),
   allSearchBtn: $('all-search-btn'),
   allMenuBtn: $('all-menu-btn'),
   allRows: $('all-rows'),
@@ -385,7 +379,6 @@ function addItem(title, body, extras = {}) {
     bookmarked: !!extras.bookmarked,
     marks: extras.marks || [],
   };
-  if (extras.hideTicked) item.hideTicked = true;
 
   state.items.push(item);
   render();
@@ -409,7 +402,7 @@ function lockBackground() {
 
 // A full-screen page can open another over itself (All lists has search and the menu), so
 // the background stays locked until the last of them has closed.
-const screens = () => [el.allLists, el.archive, el.search, el.settings];
+const screens = () => [el.allLists, el.archive, el.search, el.settings, el.reorder];
 
 function unlockBackground() {
   if (screens().some((node) => !node.hidden)) return;
@@ -558,9 +551,8 @@ let hintTimer = 0; // keeps "Saved x min ago" current while the drawer is open
 
 // The description is a small rich-text editor that saves plain Markdown (see editor.js).
 const editor = createEditor(el.itemBody, {
-  onChange: () => { updateTrash(); scheduleSave(); if (findQuery()) runFind(false); refreshAllTicked(); },
+  onChange: () => { updateTrash(); scheduleSave(); },
   onSelection: () => syncToolbar(),
-  onTick: (b, done) => tickedNow(b, done),
 });
 const getBody = () => editor.getMarkdown();
 
@@ -719,13 +711,13 @@ const dateText = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeri
 function showDrawer(mode, item) {
   // `original` is what the item looked like when it opened, so a swipe-down can put it back
   drawer = {
-    mode, item, pending: false, bookmarked: !!item?.bookmarked, marks: [...(item?.marks || [])], hideTicked: !!item?.hideTicked,
+    mode, item, pending: false, bookmarked: !!item?.bookmarked, marks: [...(item?.marks || [])],
     original: item && { title: item.title, marks: item.marks || [], body: item.body, updatedAt: item.updatedAt },
   };
   hideToast();
 
   const draft = mode === 'add' ? readDraft() : null; // an unfinished note comes back
-  if (draft) { drawer.hideTicked = !!draft.hideTicked; drawer.bookmarked = !!draft.bookmarked; drawer.marks = Array.isArray(draft.marks) ? draft.marks : []; drawer.savedAt = draft.t; }
+  if (draft) { drawer.bookmarked = !!draft.bookmarked; drawer.marks = Array.isArray(draft.marks) ? draft.marks : []; drawer.savedAt = draft.t; }
   el.itemTitle.value = item ? item.title : draft?.title ?? '';
   drawer.titleWas = el.itemTitle.value;
   editor.setMarkdown(item ? item.body : draft?.body ?? '');
@@ -735,8 +727,6 @@ function showDrawer(mode, item) {
   el.metaList.textContent = currentList().name;
   el.metaIcon.setAttribute('href', iconHref(currentList()));
   setBookmark(drawer.bookmarked);
-  resetFind();
-  applyHideTicked();
   syncTitleMark();
   expanded = false;
   el.drawer.setAttribute('aria-label', mode === 'add' ? 'New item' : 'Edit item');
@@ -767,8 +757,6 @@ const openEdit = (item) => showDrawer('edit', item);
 
 function hideDrawer() {
   cancelSave();
-  closeNoteMenu();
-  resetFind();
   clearInterval(hintTimer);
   el.itemTitle.blur();
   el.itemBody.blur();
@@ -802,7 +790,7 @@ function saveEdit() {
     const title = el.itemTitle.value;
     const body = getBody();
     const empty = !title.trim() && !body.trim();
-    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, hideTicked: drawer.hideTicked, t: Date.now() });
+    writeDraft(empty ? null : { title, body, bookmarked: drawer.bookmarked, marks: drawer.marks, t: Date.now() });
     drawer.savedAt = empty ? 0 : Date.now();
     drawer.pending = false;
     if (empty) refreshHint();
@@ -857,7 +845,7 @@ function closeDrawer() {
   if (drawer.mode === 'add') {
     if (el.itemTitle.value.trim()) {
       const { title, marks } = trimmedTitle();
-      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked, marks, hideTicked: drawer.hideTicked });
+      addItem(title, getBody().trim(), { bookmarked: drawer.bookmarked, marks });
       writeDraft(null);
     }
   } else {
@@ -869,190 +857,6 @@ function closeDrawer() {
   }
   hideDrawer();
 }
-
-/* ---------- the note's own menu (⋯) and search ---------- */
-
-// Hide ticked items, remembered for each note. A box you tick stays a moment, then folds away.
-const LINGER_MS = 1000;
-const lingering = new WeakMap(); // block -> its timer
-
-function applyHideTicked() {
-  const on = !!drawer?.hideTicked;
-  el.itemBody.classList.toggle('hide-ticked', on);
-  el.hideTicked.setAttribute('aria-checked', String(on));
-  el.hideTicked.querySelector('.switch').setAttribute('aria-checked', String(on));
-  if (!on) for (const b of el.itemBody.querySelectorAll('.linger')) b.classList.remove('linger');
-  refreshAllTicked();
-}
-
-// "Everything here is ticked off." once every tick box has been ticked and folded away
-function refreshAllTicked() {
-  const tasks = [...el.itemBody.querySelectorAll('.b.task')];
-  const all = !!drawer?.hideTicked && !findQuery() && tasks.length > 0
-    && tasks.every((b) => b.dataset.done && !b.classList.contains('linger'));
-  el.itemBody.classList.toggle('all-ticked', all);
-}
-
-function tickedNow(b, done) {
-  clearTimeout(lingering.get(b));
-  if (!done || !drawer?.hideTicked) { b.classList.remove('linger'); refreshAllTicked(); return; }
-  b.classList.add('linger');
-  const sheet = drawer;
-  lingering.set(b, setTimeout(() => {
-    if (drawer !== sheet || !b.classList.contains('linger')) return;
-    const end = () => { b.classList.remove('linger'); refreshAllTicked(); };
-    if (prefersReducedMotion()) { end(); return; }
-    const h = `${b.offsetHeight}px`;
-    b.animate([
-      { maxHeight: h, opacity: 1, overflow: 'hidden' },
-      { opacity: 0.2, transform: 'translateY(4px)', offset: 0.4 },
-      { maxHeight: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0, transform: 'translateY(8px)', overflow: 'hidden' },
-    ], { duration: 450, easing: 'cubic-bezier(.5,0,.2,1)' }).finished.then(end, end);
-  }, LINGER_MS));
-}
-
-function openNoteMenu() {
-  el.noteMenu.style.top = `${el.foot.offsetTop + el.foot.offsetHeight + 2}px`;
-  el.noteMenu.hidden = false;
-  el.noteMenuBtn.setAttribute('aria-expanded', 'true');
-}
-function closeNoteMenu() {
-  el.noteMenu.hidden = true;
-  el.noteMenuBtn.setAttribute('aria-expanded', 'false');
-}
-el.noteMenuBtn.addEventListener('click', () => (el.noteMenu.hidden ? openNoteMenu() : closeNoteMenu()));
-// A tap anywhere else closes it
-document.addEventListener('pointerdown', (e) => {
-  if (!el.noteMenu.hidden && !e.target.closest('#note-menu, #note-menu-btn')) closeNoteMenu();
-}, true);
-
-el.hideTicked.addEventListener('click', () => {
-  if (!drawer) return;
-  drawer.hideTicked = !drawer.hideTicked;
-  // A way of looking at the note, not an edit: saved straight away, without touching "Saved ..."
-  if (drawer.mode === 'edit') {
-    if (drawer.hideTicked) drawer.item.hideTicked = true; else delete drawer.item.hideTicked;
-    save(db.put('items', drawer.item));
-  } else if (readDraft()) saveEdit();
-  applyHideTicked();
-});
-
-// Search this note: every match is picked out, the current one in gold. Ticked items that
-// are hidden show while they match. Nothing in the note changes: the marks are drawn by the
-// browser (CSS highlights) on top of the text.
-const finder = { ranges: [], at: 0 };
-const canHighlight = typeof Highlight === 'function' && !!window.CSS?.highlights;
-const findQuery = () => (el.noteFind.hidden ? '' : el.findInput.value.trim());
-
-function runFind(fresh = true) {
-  const query = findQuery();
-  for (const b of el.itemBody.querySelectorAll('.hit')) b.classList.remove('hit');
-  finder.ranges = [];
-  if (query) {
-    for (const b of el.itemBody.children) {
-      // The line's text, and where each piece of it lives
-      const walker = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
-      const pieces = [];
-      let text = '';
-      for (let n = walker.nextNode(); n; n = walker.nextNode()) { pieces.push([n, text.length]); text += n.nodeValue; }
-      const folded = fold(text);
-      const same = folded.length === text.length; // folding kept the length, so positions still line up
-      const hay = same ? folded : text.toLowerCase();
-      const q = same ? fold(query) : query.toLowerCase();
-      const spot = (i, end) => {
-        let k = pieces.length - 1;
-        while (k > 0 && (end ? pieces[k][1] >= i : pieces[k][1] > i)) k--;
-        return [pieces[k][0], i - pieces[k][1]];
-      };
-      for (let i = hay.indexOf(q); i !== -1; i = hay.indexOf(q, i + q.length)) {
-        const r = document.createRange();
-        r.setStart(...spot(i, false));
-        r.setEnd(...spot(i + q.length, true));
-        finder.ranges.push(r);
-        b.classList.add('hit');
-      }
-    }
-  }
-  if (fresh) finder.at = 0;
-  finder.at = Math.min(finder.at, Math.max(0, finder.ranges.length - 1));
-  paintFind();
-  refreshAllTicked();
-  if (fresh) showMatch();
-}
-
-function paintFind() {
-  const n = finder.ranges.length;
-  if (canHighlight) {
-    if (n) CSS.highlights.set('find', new Highlight(...finder.ranges)); else CSS.highlights.delete('find');
-    if (n) CSS.highlights.set('find-now', new Highlight(finder.ranges[finder.at])); else CSS.highlights.delete('find-now');
-  }
-  el.findCount.textContent = !n ? '' : n === 1 ? '1 match' : `${finder.at + 1} of ${n}`;
-  el.findSteps.hidden = n < 2;
-  el.findElsewhere.hidden = !findQuery() || n > 0;
-}
-
-// Scroll the current match into view, a third of the way down
-function showMatch() {
-  const r = finder.ranges[finder.at];
-  if (!r) return;
-  const box = r.getBoundingClientRect();
-  const scroller = noteScroller();
-  const view = scroller.getBoundingClientRect();
-  if (box.top < view.top + 8 || box.bottom > view.bottom - 8) scroller.scrollTop += box.top - view.top - view.height / 3;
-}
-
-function stepFind(by) {
-  const n = finder.ranges.length;
-  if (n < 2) return;
-  finder.at = (finder.at + by + n) % n;
-  paintFind();
-  showMatch();
-}
-
-function openFind() {
-  if (!drawer) return;
-  closeNoteMenu();
-  el.foot.hidden = true;
-  el.noteFind.hidden = false;
-  el.findInput.value = '';
-  runFind();
-  el.findInput.focus({ preventScroll: true });
-}
-
-// Back to how it was: no search, no marks
-function resetFind() {
-  el.noteFind.hidden = true;
-  el.foot.hidden = false;
-  el.findInput.value = '';
-  runFind();
-}
-
-function closeFind() {
-  if (el.noteFind.hidden) return;
-  el.findInput.blur();
-  resetFind();
-}
-
-el.findBtn.addEventListener('click', openFind);
-el.findClose.addEventListener('click', closeFind);
-el.findInput.addEventListener('input', () => runFind());
-el.findInput.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  e.preventDefault();
-  if (finder.ranges.length > 1) stepFind(1); else el.findInput.blur(); // one match: put the keyboard away to see it
-});
-for (const [button, by] of [[el.findPrev, -1], [el.findNext, 1]]) {
-  button.addEventListener('mousedown', (e) => e.preventDefault()); // keep the keyboard up
-  button.addEventListener('click', () => stepFind(by));
-}
-// Not in this note: look everywhere instead, keeping what you wrote
-el.findAll.addEventListener('click', () => {
-  const query = el.findInput.value.trim();
-  if (drawer?.mode === 'add') dismissDrawer(); else closeDrawer();
-  openSearch();
-  el.searchInput.value = query;
-  renderSearch();
-});
 
 el.add.addEventListener('click', openAdd);
 el.scrim.addEventListener('click', dismissDrawer);
@@ -1114,6 +918,7 @@ const LAYERS = [
   { open: () => !el.menu.hidden, close: () => closeMenu() },
   { open: () => !el.listEdit.hidden, close: () => finishRename(false) },
   { open: () => !el.search.hidden, close: () => closeSearch() },
+  { open: () => !el.reorder.hidden, close: () => closeReorder() },
   { open: () => !el.resetbar.hidden, close: () => closeResetBar() },
   { open: () => !el.cleanupbar.hidden, close: () => closeCleanupBar() },
   { open: () => !el.archive.hidden && arch.mode !== 'idle', close: () => { if (arch.mode === 'pick') { arch.picks.clear(); setArchMode('idle'); } else archBack(); } },
@@ -1122,8 +927,6 @@ const LAYERS = [
   { open: () => !el.allLists.hidden, close: () => closeAll() },
   { open: () => !el.listbar.hidden, close: () => closeListBar() },
   { open: () => selection.size > 0, close: () => clearSelection() },
-  { open: () => !el.noteMenu.hidden, close: () => closeNoteMenu() },
-  { open: () => !el.noteFind.hidden, close: () => closeFind() },
   { open: () => !!drawer, close: () => dismissDrawer() }, // discards edits, like swiping down
 ];
 const closeTop = () => LAYERS.find((layer) => layer.open())?.close();
@@ -1577,8 +1380,180 @@ el.menu.addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
   closeMenu();
-  ({ all: openAll, new: newList, edit: startRename, 'archive-this': openListBar, archive: openArchive, settings: openSettings })[action]();
+  const fromAll = el.menu.classList.contains('from-all');
+  ({ all: openAll, new: newList, edit: startRename, reorder: () => openReorder(fromAll), 'archive-this': openListBar, archive: openArchive, settings: openSettings })[action]();
 });
+
+/* ---------- Reorder: the lists (from All lists), or the items of a list ---------- */
+
+// The rows move with your finger by their grips. Grips sit on the right; ⇄ moves them left.
+const GRIPS_KEY = 'find-notes:grips'; // 'left', or nothing for the right
+let reorder = null; // while open: { store: 'lists' | 'items', things, slots }
+
+function gripsLeft() {
+  try { return localStorage.getItem(GRIPS_KEY) === 'left'; } catch { return false; }
+}
+
+function openReorder(lists) {
+  const list = currentList();
+  const things = lists ? [...state.lists] : itemsOf(list.id);
+  // The order numbers already in use, handed out again in the new order. Archived items keep
+  // their numbers, so one restored later still lands near where it was.
+  reorder = { store: lists ? 'lists' : 'items', things, slots: things.map((t) => t.order).sort((a, b) => a - b) };
+  el.reorderTitle.textContent = lists ? 'All lists' : list.name;
+  el.reorderIcon.setAttribute('href', lists ? '#i-flame' : iconHref(list));
+  el.reorderRows.classList.toggle('grips-left', gripsLeft());
+  if (things.length) el.reorderRows.replaceChildren(...things.map(reorderRow));
+  else {
+    const none = document.createElement('p');
+    none.className = 'search-empty';
+    none.textContent = 'Nothing to reorder yet';
+    el.reorderRows.replaceChildren(none);
+  }
+  el.reorderBody.scrollTop = 0;
+  showScreen(el.reorder, el.reorderDone);
+}
+
+function closeReorder() {
+  if (lift) drop();
+  saveOrder();
+  reorder = null;
+  hideScreen(el.reorder);
+  render();
+  if (!el.allLists.hidden) renderAll();
+}
+
+function reorderRow(thing) {
+  const row = document.createElement('div');
+  row.className = 'all-row re-row';
+  row.setAttribute('role', 'listitem');
+  row.dataset.id = thing.id;
+  const name = document.createElement('span');
+  name.className = 'all-name';
+  if (reorder.store === 'lists') {
+    // iconHref is always one of ours, so building the svg from a string is safe
+    row.insertAdjacentHTML('beforeend', `<span class="tile small"><svg class="icon" aria-hidden="true"><use href="${iconHref(thing)}"/></svg></span>`);
+    name.textContent = thing.name;
+    const count = document.createElement('span');
+    count.className = 'all-count';
+    count.textContent = String(state.items.filter((i) => i.listId === thing.id && !i.done).length);
+    row.append(name, count);
+  } else {
+    row.classList.toggle('done', !!thing.done);
+    row.insertAdjacentHTML('beforeend', '<span class="circle" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>');
+    name.textContent = thing.title;
+    row.append(name);
+  }
+  const grip = document.createElement('button');
+  grip.className = 'grip';
+  grip.setAttribute('aria-label', `Move ${thing.name ?? thing.title}`);
+  grip.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-grip"/></svg>';
+  row.append(grip);
+  return row;
+}
+
+// Writes the new order. Only the rows whose number changed are saved.
+function saveOrder() {
+  if (!reorder) return;
+  const byId = new Map(reorder.things.map((t) => [t.id, t]));
+  const changed = [];
+  [...el.reorderRows.querySelectorAll('.re-row')].forEach((row, i) => {
+    const thing = byId.get(row.dataset.id);
+    if (thing && thing.order !== reorder.slots[i]) { thing.order = reorder.slots[i]; changed.push(thing); }
+  });
+  if (!changed.length) return;
+  if (reorder.store === 'lists') state.lists.sort((a, b) => a.order - b.order);
+  save(db.batch({ put: changed.map((t) => [reorder.store, t]) }));
+}
+
+// A row that has just been passed slides into its new place
+const slideRow = (row, from) => row.animate([{ transform: `translateY(${from}px)` }, { transform: 'none' }],
+  { duration: prefersReducedMotion() ? 1 : 200, easing: 'cubic-bezier(.2,.8,.2,1)' });
+
+let lift = null; // the row being dragged: { id, row, y, top, at }
+
+el.reorderRows.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('.grip');
+  if (!grip || lift || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  e.preventDefault();
+  grip.setPointerCapture(e.pointerId);
+  lift = { id: e.pointerId, row: grip.closest('.re-row'), y: e.clientY, top: el.reorderBody.scrollTop, at: e.clientY };
+  lift.row.classList.add('lifted');
+  requestAnimationFrame(edgeScroll);
+});
+
+el.reorderRows.addEventListener('pointermove', (e) => {
+  if (!lift || e.pointerId !== lift.id) return;
+  lift.at = e.clientY;
+  follow();
+});
+
+// Moves the held row with the finger, and swaps it past any row it is more than half over
+function follow() {
+  const { row } = lift;
+  let dy = lift.at - lift.y + el.reorderBody.scrollTop - lift.top;
+  for (;;) {
+    const next = row.nextElementSibling;
+    const prev = row.previousElementSibling;
+    if (next && dy > next.offsetHeight / 2) {
+      const h = next.offsetHeight;
+      next.after(row); lift.y += h; dy -= h; slideRow(next, h);
+    } else if (prev && dy < -prev.offsetHeight / 2) {
+      const h = prev.offsetHeight;
+      prev.before(row); lift.y -= h; dy += h; slideRow(prev, -h);
+    } else break;
+  }
+  row.style.transform = `translateY(${dy}px)`;
+}
+
+// Held near the top or bottom edge, the page scrolls to bring more rows into reach
+function edgeScroll() {
+  if (!lift) return;
+  const box = el.reorderBody.getBoundingClientRect();
+  const speed = lift.at < box.top + 64 ? -8 : lift.at > box.bottom - 64 ? 8 : 0;
+  if (speed) {
+    const before = el.reorderBody.scrollTop;
+    el.reorderBody.scrollTop += speed;
+    if (el.reorderBody.scrollTop !== before) follow();
+  }
+  requestAnimationFrame(edgeScroll);
+}
+
+function drop() {
+  const { row } = lift;
+  lift = null;
+  const dy = parseFloat(row.style.transform.slice(11)) || 0; // translateY(…px)
+  row.style.transform = '';
+  if (dy) slideRow(row, dy);
+  setTimeout(() => row.classList.remove('lifted'), 180);
+  saveOrder();
+}
+
+for (const type of ['pointerup', 'pointercancel']) {
+  el.reorderRows.addEventListener(type, (e) => { if (lift && e.pointerId === lift.id) drop(); });
+}
+
+// With a keyboard, the arrow keys move the focused grip's row
+el.reorderRows.addEventListener('keydown', (e) => {
+  const row = e.target.closest('.grip')?.closest('.re-row');
+  if (!row || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const other = e.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+  if (!other) return;
+  if (e.key === 'ArrowUp') other.before(row); else other.after(row);
+  e.target.focus();
+  saveOrder();
+});
+
+el.reorderFlip.addEventListener('click', () => {
+  const left = !el.reorderRows.classList.contains('grips-left');
+  el.reorderRows.classList.toggle('grips-left', left);
+  el.reorderRows.classList.remove('flipping');
+  void el.reorderRows.offsetWidth; // restart the grips' little pop-in
+  el.reorderRows.classList.add('flipping');
+  try { if (left) localStorage.setItem(GRIPS_KEY, 'left'); else localStorage.removeItem(GRIPS_KEY); } catch { /* not remembered, that's all */ }
+});
+el.reorderDone.addEventListener('click', closeReorder);
 
 /* ---------- the All lists screen ---------- */
 
@@ -2683,96 +2658,20 @@ function markTheme() {
   el.sketchSwitch.setAttribute('aria-checked', String(sketch));
 }
 
-// The look a theme and style give: its background, and the flame's colour on it
-function lookFor(t, sk) {
-  if (sk) return { bg: '#f8f8ff', ink: '#2b2a26' };
-  const light = t === 'light' || (t === 'auto' && phoneIsLight.matches);
-  return light ? { bg: '#fbfbfa', ink: '#e0ad1f' } : { bg: '#15181a', ink: '#c9a95e' };
-}
-
-// Changing the theme: the new background grows from the tapped button, the flame draws in the
-// middle, then it all fades away. It is a fixed layer over the whole screen, like the opening
-// screen, so iOS 26 takes the new status bar colour from it as it appears.
-let themeBusy = false;
-function changeLook(origin, change) {
-  const from = lookFor(theme, sketch);
-  change();
-  const to = lookFor(theme, sketch);
-  markTheme();
-  if (themeBusy || to.bg === from.bg) { applyTheme(); return; }
-  themeBusy = true;
-
-  const wash = document.createElement('div');
-  wash.className = 'theme-wash';
-  wash.setAttribute('aria-hidden', 'true');
-  let cover = null;
-  const done = () => { wash.remove(); cover?.remove(); themeBusy = false; };
-
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    wash.style.backgroundColor = to.bg;
-    document.body.append(wash);
-    wash.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, fill: 'forwards' }).finished.then(() => {
-      applyTheme();
-      wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).finished.then(done);
-    });
-    return;
-  }
-
-  // A circle from the button's centre, big enough to reach the furthest corner
-  const r = origin.getBoundingClientRect();
-  const x = r.left + r.width / 2, y = r.top + r.height / 2;
-  const w = window.innerWidth, h = window.innerHeight;
-  const size = 2 * Math.max(Math.hypot(x, y), Math.hypot(w - x, y), Math.hypot(x, h - y), Math.hypot(w - x, h - y));
-  const blob = document.createElement('div');
-  blob.className = 'theme-blob';
-  Object.assign(blob.style, { left: (x - size / 2) + 'px', top: (y - size / 2) + 'px', width: size + 'px', height: size + 'px', backgroundColor: to.bg });
-
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const flame = document.createElementNS(svgNS, 'svg');
-  flame.setAttribute('class', 'theme-flame');
-  flame.setAttribute('viewBox', '0 0 24 24');
-  flame.style.stroke = to.ink;
-  const path = document.createElementNS(svgNS, 'path');
-  path.setAttribute('pathLength', '1');
-  path.setAttribute('d', 'M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z');
-  flame.append(path);
-  wash.append(blob, flame);
-  document.body.append(wash);
-
-  blob.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 520, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' })
-    .finished.then(() => {
-      // Covered: switch the app underneath, and add a fixed full-screen layer of its own in the
-      // new colour. iOS 26 only takes a status bar colour from a fixed layer's background-color,
-      // as that layer appears; the circle and the wash don't count.
-      cover = document.createElement('div');
-      cover.className = 'theme-cover';
-      cover.setAttribute('aria-hidden', 'true');
-      cover.style.backgroundColor = to.bg;
-      document.body.append(cover);
-      applyTheme();
-    });
-  path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 650, delay: 260, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' });
-  setTimeout(() => {
-    cover?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
-    wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' }).finished.then(done);
-  }, 1000);
-}
-
 el.sketchSwitch.addEventListener('click', () => {
-  changeLook(el.sketchSwitch, () => {
-    sketch = !sketch;
-    try { if (sketch) localStorage.setItem(STYLE_KEY, 'sketch'); else localStorage.removeItem(STYLE_KEY); } catch { /* storage blocked */ }
-  });
+  sketch = !sketch;
+  try { if (sketch) localStorage.setItem(STYLE_KEY, 'sketch'); else localStorage.removeItem(STYLE_KEY); } catch { /* storage blocked */ }
+  applyTheme();
+  markTheme();
 });
 
 el.themeSeg.addEventListener('click', (e) => {
-  const btn = e.target.closest('button');
-  const choice = btn?.dataset.themeChoice;
-  if (!choice || choice === theme) return;
-  changeLook(btn, () => {
-    theme = choice;
-    try { localStorage.setItem(THEME_KEY, choice); } catch { /* storage blocked: applies for this visit only */ }
-  });
+  const choice = e.target.closest('button')?.dataset.themeChoice;
+  if (!choice) return;
+  theme = choice;
+  try { localStorage.setItem(THEME_KEY, choice); } catch { /* storage blocked: applies for this visit only */ }
+  applyTheme();
+  markTheme();
 });
 
 // Show icons: off hides the icon next to each list, for a plainer look
@@ -3011,7 +2910,6 @@ function cleanItem(i, index) {
     const ranges = i.marks.filter((m) => Array.isArray(m) && Number.isInteger(m[0]) && Number.isInteger(m[1]));
     item.marks = tidyMarks(ranges.slice(0, 100).map(([a, b]) => [a, b]), item.title.length);
   }
-  if (i.hideTicked === true) item.hideTicked = true;
   if (Number.isFinite(i.archivedAt)) item.archivedAt = i.archivedAt;
   if (isId(i.archivedWith)) item.archivedWith = i.archivedWith;
   return item;

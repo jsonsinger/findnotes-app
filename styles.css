@@ -906,84 +906,6 @@ h1, h2 {
   text-decoration: line-through;
 }
 
-/* Hide ticked items (the note's ⋯ menu): a ticked line folds away after a moment (.linger),
-   but still shows, faded, while it matches a search (.hit) */
-#item-body.hide-ticked .b.task[data-done]:not(.linger, .hit) { display: none; }
-#item-body.hide-ticked .b.task[data-done].hit { opacity: 0.55; }
-#item-body.all-ticked::after {
-  content: 'Everything here is ticked off.';
-  display: block;
-  padding: 18px 0 6px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text);
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* Search this note: every match, and the current one in gold */
-::highlight(find) { background-color: var(--accent-soft); color: inherit; }
-::highlight(find-now) { background-color: var(--accent); color: var(--on-accent); }
-
-.note-find {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0 -8px 6px 0;
-  flex: none;
-}
-
-.note-find .search-field { height: 40px; padding: 0 6px 0 12px; }
-.note-find .search-input { font-size: 16px; } /* 16px or iOS zooms in */
-.find-count { flex: none; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
-.find-steps { display: flex; flex: none; }
-.find-steps button {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  border-radius: 8px;
-}
-.find-steps .icon { width: 18px; height: 18px; }
-
-.find-elsewhere {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  margin: 0 0 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: var(--tile-bg);
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.find-elsewhere button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  color: var(--accent-text);
-}
-.find-elsewhere .icon { width: 14px; height: 14px; stroke-width: 2.2; }
-
-/* The note's ⋯ menu, under its top bar */
-.note-menu {
-  right: 12px;
-  width: 268px;
-  z-index: 6;
-}
-.note-menu button { justify-content: space-between; min-height: 52px; }
-.opt-text { white-space: nowrap; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; text-align: left; }
-.opt-text small { font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
-.note-menu .switch { width: 42px; height: 26px; }
-.note-menu .switch::after { top: 4px; left: 4px; width: 18px; height: 18px; }
-.note-menu .switch[aria-checked='true']::after { transform: translateX(16px); }
-#note-menu-btn[aria-expanded='true'] { background: var(--tile-bg); color: var(--text); }
-
 #item-body.is-empty .b:first-child::before {
   content: 'Add a description';
   position: absolute;
@@ -1503,6 +1425,44 @@ h1, h2 {
 /* All lists has the same header as a list: icon, name, then search and the menu */
 #all-lists > .header { gap: 10px; }
 #all-lists > .header .tile { margin-right: 0; }
+
+/* Reorder: rows held by their grips */
+#reorder .screen-body { padding-left: 16px; padding-right: 16px; }
+.re-row { position: relative; min-height: 57px; padding: 6px 2px; background: var(--bg); }
+.re-row .circle { flex: none; width: 22px; height: 22px; margin: 0 6px 0 4px; }
+.re-row.done .circle { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.re-row.done .circle .icon { display: block; }
+.re-row.done .all-name { color: var(--text-muted); text-decoration: line-through; font-weight: 500; }
+.re-row:not(:has(.tile)) .all-name { font-weight: 500; }
+.grip {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.grips-left .grip { order: -1; margin: 0 -6px 0 -10px; }
+.flipping .grip { animation: grip-in 0.3s ease; }
+@keyframes grip-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+/* The row you hold: a soft grey, no shadow */
+.re-row.lifted { z-index: 2; background: var(--surface); border-radius: 10px; border-bottom-color: transparent; }
+.re-row.lifted .grip { color: var(--accent-text); cursor: grabbing; }
+.done-pill {
+  flex: none;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 15px;
+  font-weight: 700;
+}
 
 /* Opened from All lists, the menu leaves out what is about one list */
 .menu.from-all .about-list { display: none; }
@@ -2286,6 +2246,9 @@ h1, h2 {
 }
 
 [data-style='sketch'] .row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] .re-row.done .circle { border-color: var(--ink); }
+[data-style='sketch'] .re-row.lifted { background: #eef0f4; }
+[data-style='sketch'] .done-pill { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
 [data-style='sketch'] #done[data-phase]::before { display: none; } /* Sketch draws its own wobbly circle */
 [data-style='sketch'] :is(.row.selected, .arch-row.picked) .circle { border-color: var(--ink); }
 
@@ -2381,43 +2344,6 @@ h1, h2 {
 .has-update #menu-btn::after { position: absolute; top: 6px; right: 6px; }
 .has-update .menu [data-action='settings']::after { margin-left: auto; }
 .has-update #version::after { display: inline-block; margin-left: 6px; vertical-align: 1px; }
-
-/* ---------- Theme change ----------
-   app.js (changeLook) adds this over everything when the theme or style changes: the new
-   background grows from the tapped button as a circle, the flame draws in the middle, then it
-   fades. .theme-cover is a separate fixed full-screen layer in the new colour, added once the
-   circle covers the screen: iOS 26 takes the status bar colour only from a fixed layer's own
-   background-color, as it appears. It sits under the wash so the flame stays on top. */
-.theme-wash {
-  position: fixed;
-  inset: 0;
-  z-index: 1001;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.theme-cover { position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
-
-.theme-blob {
-  position: absolute;
-  border-radius: 50%;
-  transform: scale(0);
-}
-
-.theme-flame {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  fill: none;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* pathLength="1", so a dash of 1 is the whole line */
-.theme-flame path { stroke-dasharray: 1; stroke-dashoffset: 1; }
 
 /* ---------- Opening screen ----------
    While the app starts (index.html, #boot), the flame draws itself in one line and the name
