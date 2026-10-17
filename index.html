@@ -85,15 +85,6 @@
     </symbol>
     <symbol id="i-bullets" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/></g><g fill="currentColor"><circle cx="4.5" cy="6" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/><circle cx="4.5" cy="18" r="1.4"/></g></symbol>
     <symbol id="i-task" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12.3l2.7 2.7L16.2 9.4"/></g></symbol>
-    <symbol id="i-up" viewBox="0 0 24 24">
-        <path d="M6 15l6-6 6 6"/>
-    </symbol>
-    <symbol id="i-down" viewBox="0 0 24 24">
-        <path d="M6 9l6 6 6-6"/>
-    </symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24">
-        <path d="M5 12h14M13 6l6 6-6 6"/>
-    </symbol>
     <symbol id="i-grip" viewBox="0 0 24 24">
         <path d="M5 9h14M5 15h14"/>
     </symbol>
@@ -238,41 +229,10 @@
                 <button class="icon-btn" id="bookmark" aria-label="Bookmark" aria-pressed="false" hidden>
                     <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>
                 </button>
-                <button class="icon-btn" id="note-menu-btn" aria-label="Note options" aria-haspopup="true" aria-expanded="false">
-                    <svg class="icon" aria-hidden="true"><use href="#i-dots"/></svg>
-                </button>
-                <button class="icon-btn" id="find-btn" aria-label="Search this note">
-                    <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-                </button>
                 <button class="icon-btn" id="done" aria-label="Close">
                     <svg class="icon" aria-hidden="true"><use id="done-icon" href="#i-plus"/></svg><svg class="done-morph" viewBox="0 0 28 28" aria-hidden="true"><circle class="m-ring" cx="14" cy="14" r="11"/><path class="m-x m-x1" d="M10 10l8 8"/><path class="m-x m-x2" d="M18 10l-8 8"/><path class="m-tick" d="M9.5 14.5l3 3 6-6.5"/></svg>
                 </button>
             </span>
-        </div>
-        <!-- Search this note: takes the top bar's place while it is open -->
-        <div class="note-find" id="note-find" hidden>
-            <label class="search-field">
-                <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-                <input class="search-input" id="find-input" type="search" placeholder="Search this note" aria-label="Search this note" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
-                <span class="find-count" id="find-count" aria-live="polite"></span>
-                <span class="find-steps" id="find-steps" hidden>
-                    <button type="button" id="find-prev" aria-label="Previous match"><svg class="icon" aria-hidden="true"><use href="#i-up"/></svg></button>
-                    <button type="button" id="find-next" aria-label="Next match"><svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></button>
-                </span>
-            </label>
-            <button class="icon-btn" id="find-close" aria-label="Close search">
-                <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
-            </button>
-        </div>
-        <div class="find-elsewhere" id="find-elsewhere" hidden>
-            <span>Not in this note</span>
-            <button type="button" id="find-all">Search all notes<svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button>
-        </div>
-        <div class="menu note-menu" id="note-menu" role="menu" hidden>
-            <button id="hide-ticked" role="menuitemcheckbox" aria-checked="false">
-                <span class="opt-text">Hide ticked items<small>For this note</small></span>
-                <span class="switch" aria-hidden="true"></span>
-            </button>
         </div>
         <!-- On a full-page note the title, list and note scroll together under the top bar -->
         <div class="note-scroll" id="note-scroll">
